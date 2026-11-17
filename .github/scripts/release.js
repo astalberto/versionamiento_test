@@ -103,7 +103,7 @@ async function resumenStaging({ github, context, core, ahora = new Date() }) {
   const notas = renderizarNotas({
     prs,
     equipo: cargarEquipo(),
-    titulo: `Aporte acumulado · próxima v${proxima}`,
+    titulo: `Próxima versión: v${proxima} (sin publicar)`,
     subtitulo: `${formatoFecha(ahora)} · desde ${ultima.tag}`,
     compareUrl: `${repoUrl}/compare/${ultima.tag}...${context.sha}`,
     menciones: false,
