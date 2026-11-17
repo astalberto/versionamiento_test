@@ -71,8 +71,8 @@ async function prFusionadoEn({ github, owner, repo, base, sha }) {
 
 // PRs fusionados cuyo commit de merge (squash en staging, merge commit en
 // main) está en base...head. No se usa la API "PRs asociados a un commit":
-// para commits que no están en la rama por defecto (staging) solo devuelve
-// PRs abiertos, y los merges de main no están en staging.
+// para commits que no están en la rama por defecto solo devuelve PRs
+// abiertos, y los squash de staging no están en main hasta la promoción.
 async function recolectarPRs({ github, owner, repo, base, head }) {
   const commits = await commitsEntre({ github, owner, repo, base, head });
   if (commits.length === 0) return [];

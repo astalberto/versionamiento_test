@@ -51,9 +51,9 @@ async function asegurarReferencia({ github, owner, repo, pr, numero, clase, ok }
     ok.push(`El cuerpo del PR referencia el issue #${numero}.`);
     return;
   }
-  // staging es la rama por defecto: "Closes" cierra el issue al fusionar.
-  // Hacia main (hotfix) "Closes" no cierra nada, así que solo se referencia.
-  const linea = clase === 'trabajo' ? `Closes #${numero}` : `Refs #${numero}`;
+  // main es la rama por defecto: "Closes" cierra el issue cuando el cambio
+  // llega a main (en la promoción, o al fusionar un hotfix).
+  const linea = `Closes #${numero}`;
   const body = `${(pr.body || '').trimEnd()}\n\n${linea}\n`.trimStart();
   await github.rest.pulls.update({ owner, repo, pull_number: pr.number, body });
   ok.push(`Se agregó \`${linea}\` al cuerpo del PR.`);

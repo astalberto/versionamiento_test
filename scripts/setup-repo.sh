@@ -29,7 +29,7 @@ VISIBILIDAD="$(gh repo view "$REPO" --json visibility --jq .visibility)"
 MAIN_SHA="$(gh api "repos/$REPO/git/ref/heads/main" --jq .object.sha)"
 echo "  visibilidad: $VISIBILIDAD · main en ${MAIN_SHA:0:7}"
 
-paso "Rama staging (desde main) como rama por defecto"
+paso "Rama staging (desde main)"
 if gh api "repos/$REPO/git/ref/heads/staging" >/dev/null 2>&1; then
   echo "  staging ya existe"
 else
@@ -40,13 +40,15 @@ fi
 paso "Ajustes de merge"
 # Squash para el trabajo hacia staging (un PR = un commit con el título del
 # PR); merge commit para la promoción y la sincronización. Rebase desactivado:
-# reescribe commits y rompe la comparación entre ramas.
+# reescribe commits y rompe la comparación entre ramas. main queda como rama
+# por defecto: el trabajo igual va a staging (pr-policy rechaza PRs de trabajo
+# hacia main) y los issues se cierran cuando el cambio llega a producción.
 gh api -X PATCH "repos/$REPO" \
-  -f default_branch=staging \
+  -f default_branch=main \
   -F allow_squash_merge=true -F allow_merge_commit=true -F allow_rebase_merge=false \
   -f squash_merge_commit_title=PR_TITLE -f squash_merge_commit_message=PR_BODY \
   -f merge_commit_title=PR_TITLE -f merge_commit_message=PR_BODY >/dev/null
-echo "  rama por defecto: staging · squash y merge commit · sin rebase"
+echo "  rama por defecto: main · squash y merge commit · sin rebase"
 
 paso "Etiquetas"
 # Las area:* salen de .github/labeler.yml, la misma fuente que etiqueta los PRs.
