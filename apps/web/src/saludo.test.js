@@ -10,3 +10,7 @@ test("sin nombre saluda genérico", () => {
   assert.equal(saludar("  "), "Hola");
   assert.equal(saludar(), "Hola");
 });
+
+test("colapsa espacios internos del nombre", () => {
+  assert.equal(saludar("Ana   López"), "Hola, Ana López");
+});
