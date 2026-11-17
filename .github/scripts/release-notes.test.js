@@ -2,16 +2,8 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { cargarEquipo, recolectarPRs, normalizarPR, renderizarNotas } = require('./release-notes.js');
+const { recolectarPRs, normalizarPR, renderizarNotas } = require('./release-notes.js');
 const { crearGithub, pr, commit } = require('./fakes.js');
-
-const EQUIPO = {
-  integrantes: [
-    { github: 'ALopez', nombre: 'Ana López', rol: 'FrontEnd' },
-    { github: 'lgarcia', nombre: 'Luis García', rol: 'BackEnd' },
-  ],
-  areas: { 'area:web': { nombre: 'Web' }, 'area:api': { nombre: 'API' }, 'area:docs': { nombre: 'Docs' } },
-};
 
 function escenario() {
   return {
@@ -25,14 +17,6 @@ function escenario() {
       // Fusionado antes del rango: no debe aparecer.
       pr({ numero: 2, titulo: 'feat: viejo', autor: 'alopez', head: 'feat/1-viejo', sha: 'viejo', fecha: '2026-10-01T15:00:00Z' }),
     ],
-    reviews: {
-      3: [
-        { state: 'APPROVED', user: { login: 'mperez' } },
-        { state: 'APPROVED', user: { login: 'mperez' } },
-        { state: 'COMMENTED', user: { login: 'csilva' } },
-      ],
-      4: [{ state: 'APPROVED', user: { login: 'lgarcia' } }], // auto-aprobación: no cuenta
-    },
   };
 }
 
@@ -43,8 +27,6 @@ test('recolectarPRs: PRs del rango por ancestría, sin promociones ni sincroniza
     prs.map((p) => p.numero),
     [3, 4, 5]
   );
-  assert.deepEqual(prs[0].aprobadores, ['mperez']);
-  assert.deepEqual(prs[1].aprobadores, []);
   assert.equal(prs[0].issue, 42);
   assert.equal(prs[2].esBot, true);
 });
@@ -60,10 +42,10 @@ test('normalizarPR: issue desde el cuerpo si la rama no lo trae', () => {
   assert.equal(p.issue, 77);
 });
 
-test('renderizarNotas: listas por sección, una línea por PR y pie con contribuidores', async () => {
+test('renderizarNotas: listas por sección, una línea por PR y pie con fecha y enlace', async () => {
   const github = crearGithub(escenario());
   const prs = await recolectarPRs({ github, owner: 'org', repo: 'repo', base: 'v1.0.0', head: 'head' });
-  const md = renderizarNotas({ prs, equipo: EQUIPO, titulo: 'v1.1.0', subtitulo: '16/10/2026', compareUrl: 'https://x/compare' });
+  const md = renderizarNotas({ prs, titulo: 'v1.1.0', subtitulo: '16/10/2026', compareUrl: 'https://x/compare' });
 
   assert.equal(
     md,
@@ -79,27 +61,20 @@ test('renderizarNotas: listas por sección, una línea por PR y pie con contribu
       '### Mantenimiento',
       '- Bump actions/checkout ([#5](https://github.com/org/repo/pull/5))',
       '',
-      // Nombres de equipo.json (login sin importar mayúsculas); los bots no cuentan.
-      '<sub>16/10/2026 · Contribuyeron: Ana López (@alopez), Luis García (@lgarcia) · [Ver cambios](https://x/compare)</sub>',
+      '<sub>16/10/2026 · [Ver cambios](https://x/compare)</sub>',
       '',
     ].join('\n')
   );
   assert.doesNotMatch(md, /#6|#2\b/); // sin sincronizaciones ni PRs fuera del rango
 });
 
-test('renderizarNotas: incompatibles, sin menciones en la vista previa y fallback @login', () => {
-  const prs = [normalizarPR(pr({ numero: 1, titulo: 'feat!: nueva API', autor: 'desconocido', head: 'feat/1-api', sha: 's' }))];
-  const md = renderizarNotas({ prs, equipo: EQUIPO, menciones: false });
+test('renderizarNotas: un título con ! se marca como incompatible', () => {
+  const prs = [normalizarPR(pr({ numero: 1, titulo: 'feat!: nueva API', autor: 'x', head: 'feat/1-api', sha: 's' }))];
+  const md = renderizarNotas({ prs });
   assert.match(md, /^- \*\*Incompatible:\*\* Nueva API \(\[#1\]/m);
-  assert.match(md, /Contribuyeron: `@desconocido`/);
-  assert.doesNotMatch(md, /(^|[^`])@desconocido/);
+  assert.doesNotMatch(md, /<sub>/); // sin fecha ni enlace, no hay pie
 });
 
 test('renderizarNotas: rango vacío', () => {
-  assert.match(renderizarNotas({ prs: [], equipo: EQUIPO }), /^Sin cambios\.$/m);
-});
-
-test('cargarEquipo: sin equipo.json devuelve un equipo vacío', () => {
-  const raiz = require('node:fs').mkdtempSync(require('node:path').join(require('node:os').tmpdir(), 'equipo-'));
-  assert.deepEqual(cargarEquipo(raiz), { integrantes: [], areas: {} });
+  assert.match(renderizarNotas({ prs: [] }), /^Sin cambios\.$/m);
 });

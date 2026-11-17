@@ -49,7 +49,6 @@ jobs:
             await validarPR({ github, context, core });
 
   # Etiquetas de área según las carpetas que toca el PR (.github/labeler.yml).
-  # Las notas de versión agrupan el aporte de cada integrante con ellas.
   labels:
     # Los PRs de Dependabot reciben un token de solo lectura: no se etiquetan.
     if: github.actor != 'dependabot[bot]'

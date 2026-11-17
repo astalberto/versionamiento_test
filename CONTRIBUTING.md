@@ -44,13 +44,13 @@ Formato: `<tipo>/<descripcion-en-kebab>` (p. ej. `feat/login-oauth`) o, con issu
 - GitHub rechaza crear ramas con otro prefijo (ruleset `nombres-de-rama`), y el check `pr-policy` valida el formato y, si la rama lleva número, que el issue exista y esté abierto.
 - El botón «Create a branch» de un issue sugiere `42-titulo`: cámbialo a `feat/42-titulo` antes de crearla.
 - El botón «Revert» de un PR crea ramas `revert-…` que el ruleset bloquea. Usa `git revert` en una rama `revert/…`.
-- ¿Te equivocaste de nombre? GitHub → Branches → ✏️ Rename. El PR se mantiene.
+- ¿Te equivocaste de nombre? GitHub → Branches → Rename. El PR se mantiene.
 
 ## 3. Abre el PR hacia staging
 
 - **Título:** un Conventional Commit con el **mismo tipo de la rama**, por ejemplo `feat(web): login con OAuth`. El scope es opcional y suele ser el nombre de la app o carpeta (`web`, `api`, `ci`, `docs`…).
 - **Cuerpo:** si la rama lleva issue, `Closes #42`. Si falta, el bot lo agrega, y al fusionar se cierra el issue.
-- **Bot «🤖 Política de PR»:** comenta qué está bien y qué falta. Las etiquetas `area:*` se ponen solas según las carpetas que toques.
+- **Bot «Política de PR»:** comenta qué está bien y qué falta. Las etiquetas `area:*` se ponen solas según las carpetas que toques.
 - **Para fusionar:** checks `pr-policy` y `ci-ok` en verde, 1 aprobación de otro integrante y conversaciones resueltas.
 - **Método:** **Squash and merge**. El commit en staging queda con el título del PR, que es lo que leen las notas de versión.
 
@@ -116,7 +116,7 @@ Cada release `vX.Y.Z` lleva sus notas en estilo changelog, generadas a partir de
 ### Mantenimiento
 - README de la app demo (#4)
 
-Promoción #11 · 17/11/2026 · Contribuyeron: @astalberto · Ver cambios
+Promoción #11 · 17/11/2026 · Ver cambios
 ```
 
 | Sección | Tipos de PR |
@@ -128,7 +128,6 @@ Promoción #11 · 17/11/2026 · Contribuyeron: @astalberto · Ver cambios
 
 - La línea sale de la descripción del título del PR, así que un buen título es una buena nota. Un `!` (`feat!: …`) la marca como **Incompatible**.
 - **Antes de promover:** Actions → Release → último run en `staging` → resumen con lo que saldría en la próxima versión.
-- Opcional: con un `.github/equipo.json` (`integrantes`: `github`, `nombre`, `rol`) la línea de contribuidores muestra nombres en vez de solo `@login`.
 
 ## 9. Configuración inicial (admins)
 

@@ -8,7 +8,7 @@
 
 const { clasificarPR, parseTitulo, issuesEnCuerpo } = require('./rules.js');
 const { ultimaEstable, siguiente, formatear } = require('./version.js');
-const { cargarEquipo, listarTags, commitsEntre, recolectarPRs, renderizarNotas } = require('./release-notes.js');
+const { listarTags, commitsEntre, recolectarPRs, renderizarNotas } = require('./release-notes.js');
 
 const MARCADOR = '<!-- pr-policy -->';
 const DESCRIPCION_CLASE = {
@@ -111,20 +111,18 @@ async function prepararPromocion({ github, owner, repo, pr, ok, errores }) {
 
   const notas = renderizarNotas({
     prs,
-    equipo: cargarEquipo(),
     titulo: `v${version}`,
     compareUrl: `https://github.com/${owner}/${repo}/compare/${ultima.tag}...${pr.head.sha}`,
-    menciones: false,
   });
-  return `<details><summary>📋 Vista previa de las notas de v${version}</summary>\n\n${notas}\n</details>`;
+  return `<details><summary>Vista previa de las notas de v${version}</summary>\n\n${notas}\n</details>`;
 }
 
 function comentario({ errores, avisos, ok, detalle }) {
-  const estado = errores.length ? '❌ hay que corregir antes de fusionar' : '✅ todo en orden';
-  const lineas = [MARCADOR, `### 🤖 Política de PR — ${estado}`, ''];
-  for (const e of errores) lineas.push(`- ❌ ${e}`);
-  for (const a of avisos) lineas.push(`- ⚠️ ${a}`);
-  for (const o of ok) lineas.push(`- ✅ ${o}`);
+  const estado = errores.length ? 'hay que corregir antes de fusionar' : 'todo en orden';
+  const lineas = [MARCADOR, `### Política de PR: ${estado}`, ''];
+  for (const e of errores) lineas.push(`- **Corregir:** ${e}`);
+  for (const a of avisos) lineas.push(`- **Aviso:** ${a}`);
+  for (const o of ok) lineas.push(`- ${o}`);
   if (detalle) lineas.push('', detalle);
   lineas.push('', '<sub>Reglas en CONTRIBUTING.md. Este comentario se actualiza solo en cada cambio del PR.</sub>');
   return lineas.join('\n');

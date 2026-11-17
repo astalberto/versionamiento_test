@@ -4,8 +4,6 @@
 // línea por PR. Las usan release.js (GitHub Release en main y resumen de
 // staging) y pr-policy.js (vista previa en el PR de promoción).
 
-const fs = require('node:fs');
-const path = require('node:path');
 const { parseRama, parseTitulo, issueEnCuerpo } = require('./rules.js');
 
 // Lo que ve quien usa el proyecto va primero; lo interno (docs, CI, pruebas,
@@ -22,17 +20,6 @@ const HEADS_EXCLUIDOS = new Set(['staging', 'main']);
 const POR_PAGINA = 100;
 const MAX_PAGINAS_COMPARE = 20;
 const MARGEN_MS = 2 * 24 * 60 * 60 * 1000;
-
-// equipo.json es opcional: sin él, las notas muestran el @login de cada autor
-// y el área sale del nombre de la etiqueta (area:web → web).
-function cargarEquipo(raiz = process.env.GITHUB_WORKSPACE || process.cwd()) {
-  try {
-    return JSON.parse(fs.readFileSync(path.join(raiz, '.github', 'equipo.json'), 'utf8'));
-  } catch (e) {
-    if (e.code === 'ENOENT') return { integrantes: [], areas: {} };
-    throw e;
-  }
-}
 
 // ─── Lectura del repo ─────────────────────────────────────────────────────
 
@@ -96,19 +83,10 @@ async function recolectarPRs({ github, owner, repo, base, head }) {
     }
   }
 
-  const resultado = [];
-  for (const pr of prs.values()) {
-    const reviews = await github.paginate(github.rest.pulls.listReviews, { owner, repo, pull_number: pr.number, per_page: POR_PAGINA });
-    // Evidencia de revisión por pares: quién aprobó (sin contar al autor).
-    const aprobadores = [
-      ...new Set(reviews.filter((r) => r.state === 'APPROVED' && r.user && r.user.login !== pr.user.login).map((r) => r.user.login)),
-    ];
-    resultado.push(normalizarPR(pr, aprobadores));
-  }
-  return resultado.sort((a, b) => a.numero - b.numero);
+  return [...prs.values()].map(normalizarPR).sort((a, b) => a.numero - b.numero);
 }
 
-function normalizarPR(pr, aprobadores = []) {
+function normalizarPR(pr) {
   const t = parseTitulo(pr.title);
   const rama = parseRama(pr.head.ref);
   return {
@@ -121,26 +99,12 @@ function normalizarPR(pr, aprobadores = []) {
     descripcion: t ? t.descripcion : pr.title,
     autor: pr.user.login,
     esBot: pr.user.type === 'Bot' || rama.clase === 'dependabot',
-    areas: (pr.labels || []).map((l) => (typeof l === 'string' ? l : l.name)).filter((n) => n.startsWith('area:')),
     issue: rama.issue || issueEnCuerpo(pr.body),
     rama: pr.head.ref,
-    aprobadores,
   };
 }
 
 // ─── Render ───────────────────────────────────────────────────────────────
-
-// En el Release las menciones (@login) enlazan a los contribuidores; en el
-// comentario de vista previa van como código para no notificar en cada push.
-function usuario(login, menciones) {
-  return menciones ? `@${login}` : `\`@${login}\``;
-}
-
-function contribuidor(login, equipo, menciones) {
-  const buscado = login.toLowerCase();
-  const m = (equipo.integrantes || []).find((i) => i.github && i.github.toLowerCase() === buscado);
-  return m && m.nombre ? `${m.nombre} (${usuario(login, menciones)})` : usuario(login, menciones);
-}
 
 function seccionDe(pr) {
   if (pr.esBot) return 'Mantenimiento';
@@ -155,7 +119,7 @@ function linea(pr) {
   return `- ${pr.breaking ? '**Incompatible:** ' : ''}${frase} ([#${pr.numero}](${pr.url}))`;
 }
 
-function renderizarNotas({ prs, equipo, titulo = null, subtitulo = '', compareUrl = null, menciones = true }) {
+function renderizarNotas({ prs, titulo = null, subtitulo = '', compareUrl = null }) {
   const lineas = [];
   if (titulo) lineas.push(`## ${titulo}`, '');
 
@@ -168,9 +132,7 @@ function renderizarNotas({ prs, equipo, titulo = null, subtitulo = '', compareUr
     }
   }
 
-  const autores = [...new Set(prs.filter((p) => !p.esBot).map((p) => p.autor))];
   const pie = [subtitulo];
-  if (autores.length > 0) pie.push(`Contribuyeron: ${autores.map((a) => contribuidor(a, equipo, menciones)).join(', ')}`);
   if (compareUrl) pie.push(`[Ver cambios](${compareUrl})`);
   const meta = pie.filter(Boolean).join(' · ');
   if (meta) lineas.push(`<sub>${meta}</sub>`);
@@ -179,7 +141,6 @@ function renderizarNotas({ prs, equipo, titulo = null, subtitulo = '', compareUr
 }
 
 module.exports = {
-  cargarEquipo,
   listarTags,
   commitsEntre,
   prFusionadoEn,

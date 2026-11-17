@@ -91,7 +91,7 @@ while IFS= read -r manifiesto; do
       stack="node ($pm)"
       ;;
   esac
-  filas+=("| \`$dir\` | $stack | ✅ se verifica |")
+  filas+=("| \`$dir\` | $stack | se verifica |")
 done < <(find apps services -mindepth 2 -maxdepth 3 \
   \( -name pubspec.yaml -o -name package.json -o -name pyproject.toml \) \
   -not -path '*/node_modules/*' -not -path '*/.dart_tool/*' -not -path '*/build/*' 2>/dev/null | sort)
@@ -111,7 +111,7 @@ fi
 {
   echo "### Proyectos detectados"
   echo
-  echo "Criterio: ${motivo}. Scripts del pipeline (\`.github/\`): $([[ "$pipeline" == true ]] && echo "✅ se verifican" || echo "— sin cambios")."
+  echo "Criterio: ${motivo}. Scripts del pipeline (\`.github/\`): $([[ "$pipeline" == true ]] && echo "se verifican" || echo "— sin cambios")."
   echo
   if [[ ${#filas[@]} -eq 0 ]]; then
     echo "Aún no hay proyectos con manifiesto en \`apps/\` ni \`services/\`."

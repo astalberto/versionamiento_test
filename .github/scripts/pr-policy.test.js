@@ -27,7 +27,7 @@ test('trabajo válido: agrega Closes #N y comenta sin errores', async () => {
   assert.equal(salida.fallo, null);
   assert.deepEqual(github.escrituras('pulls.update'), [{ owner: 'org', repo: 'repo', pull_number: 10, body: 'Detalle\n\nCloses #42\n' }]);
   assert.ok(comentario.startsWith(MARCADOR));
-  assert.match(comentario, /✅ todo en orden/);
+  assert.match(comentario, /Política de PR: todo en orden/);
   assert.match(comentario, /Issue #42 abierto/);
   assert.deepEqual(github.escrituras('addLabels'), []);
 });
@@ -48,7 +48,7 @@ test('trabajo sin issue: pasa sin consultar issues ni tocar el cuerpo', async ()
 test('rama inválida: falla y explica cómo corregir', async () => {
   const { salida, comentario } = await correr({}, prAbierto({ titulo: 'feat: x', head: 'ana-pruebas' }));
   assert.match(salida.fallo, /1 problema/);
-  assert.match(comentario, /❌ La rama `ana-pruebas` no cumple la convención/);
+  assert.match(comentario, /\*\*Corregir:\*\* La rama `ana-pruebas` no cumple la convención/);
 });
 
 test('issue inexistente, cerrado o que es un PR', async () => {
@@ -87,8 +87,8 @@ test('promoción: fija título con la versión y comenta la vista previa', async
   assert.equal(github.escrituras('pulls.update')[0].title, 'chore(release): v1.1.0');
   assert.deepEqual(github.escrituras('addLabels')[0].labels, ['promocion']);
   assert.match(comentario, /Al fusionar se publica \*\*v1\.1\.0\*\* \(minor\) con 1 PR\(s\)/);
-  assert.match(comentario, /<details><summary>📋 Vista previa de las notas de v1\.1\.0<\/summary>/);
-  assert.match(comentario, /`@alopez`/); // sin notificar en la vista previa
+  assert.match(comentario, /<details><summary>Vista previa de las notas de v1\.1\.0<\/summary>/);
+  assert.match(comentario, /- Login \(\[#3\]/);
 });
 
 test('promoción con version:mayor, hotfix sin sincronizar y sin cambios', async () => {

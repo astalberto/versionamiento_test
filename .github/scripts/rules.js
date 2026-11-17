@@ -59,7 +59,7 @@ function errorNombreRama(head) {
   return (
     `La rama \`${head}\` no cumple la convención. Usa \`<tipo>/<descripcion>\` o \`<tipo>/<issue>-<descripcion>\` ` +
     `(p. ej. ${EJEMPLO_RAMA}) con tipo en: ${TIPOS.join(', ')}. ` +
-    'Para renombrarla sin perder el PR: GitHub → Branches → ✏️ Rename.'
+    'Para renombrarla sin perder el PR: GitHub → Branches → Rename.'
   );
 }
 

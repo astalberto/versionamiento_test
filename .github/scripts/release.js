@@ -5,7 +5,7 @@
 // solo resume en el job lo acumulado desde el último release y la versión que saldría.
 
 const { ultimaEstable, siguiente, formatear, formatoFecha } = require('./version.js');
-const { cargarEquipo, listarTags, prFusionadoEn, recolectarPRs, renderizarNotas } = require('./release-notes.js');
+const { listarTags, prFusionadoEn, recolectarPRs, renderizarNotas } = require('./release-notes.js');
 
 // Salidas del workflow (workflow_call): un futuro deploy-production.yml las
 // usa para estampar la versión en el build.
@@ -60,10 +60,8 @@ async function publicar({ github, context, core, ahora = new Date() }) {
   const prs = await recolectarPRs({ github, owner, repo, base: ultima.tag, head: sha });
   const notas = renderizarNotas({
     prs,
-    equipo: cargarEquipo(),
     subtitulo: `${origen} · ${formatoFecha(ahora)}`,
     compareUrl: `${repoUrl}/compare/${ultima.tag}...${tag}`,
-    menciones: true,
   });
 
   await github.rest.repos.createRelease({
@@ -78,11 +76,11 @@ async function publicar({ github, context, core, ahora = new Date() }) {
   salidas(core, { publicado: true, version, tag });
   core.notice(`Publicada ${tag}.`);
 
-  const resumen = core.summary.addHeading(`🚀 ${tag}`, 2).addLink('Ver el release', `${repoUrl}/releases/tag/${tag}`).addRaw(`\n\n${notas}`);
+  const resumen = core.summary.addHeading(tag, 2).addLink('Ver el release', `${repoUrl}/releases/tag/${tag}`).addRaw(`\n\n${notas}`);
   if (incremento === 'patch') {
     const titulo = encodeURIComponent(`chore(sync): main → staging (${tag})`);
     resumen.addRaw(
-      '\n\n### ⚠️ Falta sincronizar staging\n' +
+      '\n\n### Falta sincronizar staging\n' +
         `El hotfix está en main pero no en staging. [Abre el PR de sincronización](${repoUrl}/compare/staging...main?expand=1&title=${titulo}) ` +
         'y fusiónalo con **Create a merge commit**.'
     );
@@ -102,11 +100,9 @@ async function resumenStaging({ github, context, core, ahora = new Date() }) {
   const prs = await recolectarPRs({ github, owner, repo, base: ultima.tag, head: context.sha });
   const notas = renderizarNotas({
     prs,
-    equipo: cargarEquipo(),
     titulo: `Próxima versión: v${proxima} (sin publicar)`,
     subtitulo: `${formatoFecha(ahora)} · desde ${ultima.tag}`,
     compareUrl: `${repoUrl}/compare/${ultima.tag}...${context.sha}`,
-    menciones: false,
   });
   await core.summary.addRaw(notas).write();
 }

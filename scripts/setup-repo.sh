@@ -15,7 +15,7 @@ RAIZ="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 ZONA="${TZ_EQUIPO:-America/Guayaquil}"
 
 paso() { printf '\n▶ %s\n' "$*"; }
-aviso() { printf '  ⚠️  %s\n' "$*" >&2; }
+aviso() { printf '  AVISO: %s\n' "$*" >&2; }
 
 # Lee un campo de un JSON por stdin (evita problemas de rutas en Windows).
 json() { node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{$1})"; }
@@ -62,7 +62,7 @@ paso "Etiquetas"
     version:mayor b60205 "En una promoción: publica MAJOR en vez de minor"
 } | while IFS=$'\t' read -r nombre color descripcion; do
   gh label create "$nombre" --repo "$REPO" --color "$color" --description "$descripcion" --force >/dev/null
-  echo "  ✓ $nombre"
+  echo "  - $nombre"
 done
 
 paso "Variables del repo"
@@ -91,7 +91,7 @@ for archivo in "$RAIZ"/.github/rulesets/*.json; do
     metodo=POST ruta="repos/$REPO/rulesets"
   fi
   if salida="$(gh api -X "$metodo" "$ruta" --input - <"$archivo" 2>&1)"; then
-    echo "  ✓ $nombre"
+    echo "  - $nombre"
   else
     reglas_ok=false
     aviso "No se pudo aplicar «$nombre»: $salida"
@@ -114,7 +114,6 @@ else
   fi
 fi
 
-printf '\n✅ Listo. Siguientes pasos:\n'
-echo "  1. (Opcional) Crear .github/equipo.json con nombres y roles para las notas (PR a staging)."
-echo "  2. Cada integrante: git fetch && git switch staging."
-echo "  3. Para publicar: PR staging → main («Create a merge commit») → Release."
+printf '\nListo. Siguientes pasos:\n'
+echo "  1. Cada integrante: git fetch && git switch staging."
+echo "  2. Para publicar: PR staging → main («Create a merge commit») → Release."

@@ -22,7 +22,6 @@ function crearGithub(estado) {
     pulls: {
       list: async ({ base, per_page: porPagina }) =>
         datos((estado.prs || []).filter((pr) => pr.base.ref === base).sort(porActualizacion).slice(0, porPagina)),
-      listReviews: async ({ pull_number: n }) => datos((estado.reviews || {})[n] || []),
       update: async (p) => (registrar('pulls.update', p), datos({})),
     },
     issues: {
