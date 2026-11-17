@@ -1,7 +1,7 @@
 name: PR Policy
 
 # Valida cada PR hacia staging o main: nombre de rama, título Conventional
-# Commits, issue enlazado y, en la promoción semanal, la versión y las notas
+# Commits, issue enlazado y, en la promoción, la versión y las notas
 # que se publicarán. Reglas en .github/scripts/rules.js (documentadas en
 # CONTRIBUTING.md).
 #
@@ -43,9 +43,6 @@ jobs:
 
       - name: Validar PR
         uses: actions/github-script@v9
-        env:
-          PROJECT_START_DATE: ${{ vars.PROJECT_START_DATE || '2026-10-05' }}
-          TZ_EQUIPO: ${{ vars.TZ_EQUIPO || 'America/Guayaquil' }}
         with:
           script: |
             const { validarPR } = require('./.github/scripts/pr-policy.js');

@@ -4,7 +4,9 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { parseRama, parseTitulo, issuesEnCuerpo, issueEnCuerpo, clasificarPR } = require('./rules.js');
 
-test('parseRama: ramas de trabajo con issue y descripción en kebab', () => {
+test('parseRama: ramas de trabajo con o sin issue y descripción en kebab', () => {
+  assert.deepEqual(parseRama('feat/login-oauth'), { clase: 'trabajo', tipo: 'feat', issue: null, descripcion: 'login-oauth' });
+  assert.deepEqual(parseRama('ci/quitar-semanas-v2'), { clase: 'trabajo', tipo: 'ci', issue: null, descripcion: 'quitar-semanas-v2' });
   assert.deepEqual(parseRama('feat/42-login-oauth'), { clase: 'trabajo', tipo: 'feat', issue: 42, descripcion: 'login-oauth' });
   assert.deepEqual(parseRama('fix/7-timeout'), { clase: 'trabajo', tipo: 'fix', issue: 7, descripcion: 'timeout' });
   assert.equal(parseRama('chore/100-actualizar-deps-v2').clase, 'trabajo');
@@ -12,8 +14,7 @@ test('parseRama: ramas de trabajo con issue y descripción en kebab', () => {
 
 test('parseRama: rechaza nombres fuera de convención', () => {
   for (const mala of [
-    'feat/login-oauth', // sin issue
-    'feat/0-login', // issue 0
+    'feat/0-login', // issue 0 (sin issue, la descripción empieza por letra)
     'feat/042-login', // cero a la izquierda
     'feat/42-Login', // mayúsculas
     'feat/42_login', // guion bajo
@@ -30,6 +31,7 @@ test('parseRama: rechaza nombres fuera de convención', () => {
 
 test('parseRama: hotfix, dependabot y ramas largas', () => {
   assert.deepEqual(parseRama('hotfix/57-crash-carga'), { clase: 'hotfix', tipo: 'fix', issue: 57, descripcion: 'crash-carga' });
+  assert.deepEqual(parseRama('hotfix/crash-carga'), { clase: 'hotfix', tipo: 'fix', issue: null, descripcion: 'crash-carga' });
   assert.equal(parseRama('dependabot/github_actions/acciones-1a2b').clase, 'dependabot');
   assert.equal(parseRama('main').clase, 'main');
   assert.equal(parseRama('staging').clase, 'staging');

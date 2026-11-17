@@ -1,11 +1,10 @@
 name: Release
 
-# Publica la versión cuando se fusiona en main una promoción semanal
-# (staging → main: sube minor) o un hotfix (sube patch): tag vX.Y.Z y GitHub
-# Release con el aporte por integrante y área, que es el material de la
-# defensa semanal. Sin Release PRs ni pasos manuales. En staging no crea
-# tags: solo resume en el job lo acumulado de la semana y la versión que
-# saldría. Lógica en .github/scripts/release.js.
+# Publica la versión cuando se fusiona en main una promoción (staging → main:
+# sube minor) o un hotfix (sube patch): tag vX.Y.Z y GitHub Release con el
+# aporte por integrante y área. Sin Release PRs ni pasos manuales. En staging
+# no crea tags: solo resume en el job lo acumulado desde el último release y
+# la versión que saldría. Lógica en .github/scripts/release.js.
 #
 # Reutilizable (workflow_call), siguiendo el patrón de la referencia de
 # deploy (release → checks → deploy): cuando exista deploy-production.yml,
@@ -62,7 +61,6 @@ jobs:
         id: release
         uses: actions/github-script@v9
         env:
-          PROJECT_START_DATE: ${{ vars.PROJECT_START_DATE || '2026-10-05' }}
           TZ_EQUIPO: ${{ vars.TZ_EQUIPO || 'America/Guayaquil' }}
         with:
           script: |
@@ -85,7 +83,6 @@ jobs:
       - name: Resumir el aporte acumulado
         uses: actions/github-script@v9
         env:
-          PROJECT_START_DATE: ${{ vars.PROJECT_START_DATE || '2026-10-05' }}
           TZ_EQUIPO: ${{ vars.TZ_EQUIPO || 'America/Guayaquil' }}
         with:
           script: |

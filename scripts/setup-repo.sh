@@ -12,7 +12,6 @@ set -euo pipefail
 
 REPO="${1:?Uso: scripts/setup-repo.sh <owner/repo>}"
 RAIZ="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-INICIO="${PROJECT_START_DATE:-2026-10-05}"
 ZONA="${TZ_EQUIPO:-America/Guayaquil}"
 
 paso() { printf '\n▶ %s\n' "$*"; }
@@ -56,7 +55,7 @@ paso "Etiquetas"
     printf '%s\t%s\t%s\n' "$area" ededed "Área: ${area#area:}"
   done
   printf '%s\t%s\t%s\n' \
-    promocion 0e8a16 "Promoción semanal staging → main (sube minor)" \
+    promocion 0e8a16 "Promoción staging → main (sube minor)" \
     hotfix d93f0b "Corrección urgente directa a main (sube patch)" \
     sincronizacion c5def5 "Sincronización main → staging tras un hotfix" \
     dependencias bfdadc "Actualizaciones de Dependabot" \
@@ -67,9 +66,9 @@ paso "Etiquetas"
 done
 
 paso "Variables del repo"
-gh variable set PROJECT_START_DATE --repo "$REPO" --body "$INICIO"
+# Zona horaria de las fechas de los releases.
 gh variable set TZ_EQUIPO --repo "$REPO" --body "$ZONA"
-echo "  Semana 1 = $INICIO ($ZONA)"
+echo "  TZ_EQUIPO = $ZONA"
 
 paso "Línea base v1.0.0"
 if gh api "repos/$REPO/git/ref/tags/v1.0.0" >/dev/null 2>&1; then
@@ -77,7 +76,7 @@ if gh api "repos/$REPO/git/ref/tags/v1.0.0" >/dev/null 2>&1; then
 else
   gh release create v1.0.0 --repo "$REPO" --target "$MAIN_SHA" --latest \
     --title "v1.0.0 · Línea base" \
-    --notes "Línea base del proyecto. Desde aquí, cada promoción semanal staging → main publica un minor y cada hotfix un patch." >/dev/null
+    --notes "Línea base del proyecto. Desde aquí, cada promoción staging → main publica un minor y cada hotfix un patch." >/dev/null
   echo "  v1.0.0 creada en ${MAIN_SHA:0:7}"
 fi
 
@@ -118,4 +117,4 @@ fi
 printf '\n✅ Listo. Siguientes pasos:\n'
 echo "  1. (Opcional) Crear .github/equipo.json con nombres y roles para las notas (PR a staging)."
 echo "  2. Cada integrante: git fetch && git switch staging."
-echo "  3. Al cierre de la semana: PR staging → main («Create a merge commit») → Release."
+echo "  3. Para publicar: PR staging → main («Create a merge commit») → Release."
