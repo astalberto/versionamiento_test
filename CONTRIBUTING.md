@@ -102,13 +102,33 @@ Reglas de la promoción:
 - Los releases se titulan `vX.Y.Z`. Las notas llevan la fecha de publicación en la zona `TZ_EQUIPO` (por defecto `America/Guayaquil`).
 - Los tags `v*` los crea solo el workflow, y nadie puede moverlos ni borrarlos (ruleset `tags-de-version`).
 
-## 8. Aporte por integrante
+## 8. Notas de versión
 
-- **Releases** → cada `vX.Y.Z` incluye:
-  - la tabla **Aporte por integrante**: rol, PRs, feat, fix y áreas;
-  - el detalle por tipo, con PR, área, issue y quién aprobó.
-- **Antes de promover:** Actions → Release → último run en `staging` → resumen «Aporte acumulado».
-- Opcional: con un `.github/equipo.json` (`integrantes`: `github`, `nombre`, `rol`; `areas`: nombre visible por etiqueta) las notas muestran nombres y roles. Sin él, aparece solo el `@login` y el nombre de la etiqueta.
+Cada release `vX.Y.Z` lleva sus notas en estilo changelog, generadas a partir de los títulos de los PRs:
+
+```markdown
+### Agregado o cambiado
+- Función presentar con nombre y rol (#8)
+
+### Corregido
+- Colapsar espacios internos en el saludo (#3)
+
+### Mantenimiento
+- README de la app demo (#4)
+
+Promoción #11 · 17/11/2026 · Contribuyeron: @astalberto · Ver cambios
+```
+
+| Sección | Tipos de PR |
+|---|---|
+| Agregado o cambiado | `feat`, `perf`, `refactor` |
+| Corregido | `fix` |
+| Revertido | `revert` |
+| Mantenimiento | `docs`, `style`, `test`, `build`, `ci`, `chore` y Dependabot |
+
+- La línea sale de la descripción del título del PR, así que un buen título es una buena nota. Un `!` (`feat!: …`) la marca como **Incompatible**.
+- **Antes de promover:** Actions → Release → último run en `staging` → resumen con lo que saldría en la próxima versión.
+- Opcional: con un `.github/equipo.json` (`integrantes`: `github`, `nombre`, `rol`) la línea de contribuidores muestra nombres en vez de solo `@login`.
 
 ## 9. Configuración inicial (admins)
 

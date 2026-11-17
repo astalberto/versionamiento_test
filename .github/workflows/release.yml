@@ -1,8 +1,8 @@
 name: Release
 
 # Publica la versión cuando se fusiona en main una promoción (staging → main:
-# sube minor) o un hotfix (sube patch): tag vX.Y.Z y GitHub Release con el
-# aporte por integrante y área. Sin Release PRs ni pasos manuales. En staging
+# sube minor) o un hotfix (sube patch): tag vX.Y.Z y GitHub Release con las
+# notas en estilo changelog. Sin Release PRs ni pasos manuales. En staging
 # no crea tags: solo resume en el job lo acumulado desde el último release y
 # la versión que saldría. Lógica en .github/scripts/release.js.
 #
@@ -80,7 +80,7 @@ jobs:
           sparse-checkout: .github
           persist-credentials: false
 
-      - name: Resumir el aporte acumulado
+      - name: Resumir lo acumulado
         uses: actions/github-script@v9
         env:
           TZ_EQUIPO: ${{ vars.TZ_EQUIPO || 'America/Guayaquil' }}
