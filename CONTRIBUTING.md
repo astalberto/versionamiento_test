@@ -11,12 +11,12 @@ hotfix/57-crash (desde main) ──PR (merge commit)──► main ─► v1.1.1
 
 | Rama | Papel | Cómo llega el código |
 |---|---|---|
-| `staging` | Desarrollo y rama por defecto. Aquí aportamos todos. | PR con **squash** desde `<tipo>/<descripcion>` o `<tipo>/<issue>-<descripcion>` |
-| `main` | Producción. Nadie hace push directo. | PR de promoción o PR de hotfix, con **merge commit** |
+| `staging` | Desarrollo. Aquí aportamos todos. | PR con **squash** desde `<tipo>/<descripcion>` o `<tipo>/<issue>-<descripcion>` |
+| `main` | Producción y rama por defecto. Nadie hace push directo. | PR de promoción o PR de hotfix, con **merge commit** |
 
 ## 1. Issue (opcional)
 
-Si la tarea tiene issue (plantilla **Tarea**: área, tipo y criterios de aceptación), pon su número en el nombre de la rama: así queda enlazado rama → issue → PR → release y el issue se cierra al fusionar. Para cambios pequeños puedes saltarte el issue.
+Si la tarea tiene issue (plantilla **Tarea**: área, tipo y criterios de aceptación), pon su número en el nombre de la rama: así queda enlazado rama → issue → PR → release y el issue se cierra cuando el cambio llega a `main`. Para cambios pequeños puedes saltarte el issue.
 
 ## 2. Crea la rama desde staging
 
@@ -49,7 +49,8 @@ Formato: `<tipo>/<descripcion-en-kebab>` (p. ej. `feat/login-oauth`) o, con issu
 ## 3. Abre el PR hacia staging
 
 - **Título:** un Conventional Commit con el **mismo tipo de la rama**, por ejemplo `feat(web): login con OAuth`. El scope es opcional y suele ser el nombre de la app o carpeta (`web`, `api`, `ci`, `docs`…).
-- **Cuerpo:** si la rama lleva issue, `Closes #42`. Si falta, el bot lo agrega, y al fusionar se cierra el issue.
+- **Base:** `staging`. Como `main` es la rama por defecto, GitHub propone `main`: cámbiala, o `pr-policy` lo rechazará.
+- **Cuerpo:** si la rama lleva issue, `Closes #42`. Si falta, el bot lo agrega. El issue se cierra cuando el cambio llega a `main` (en la promoción).
 - **Bot «🤖 Política de PR»:** comenta qué está bien y qué falta. Las etiquetas `area:*` se ponen solas según las carpetas que toques.
 - **Para fusionar:** checks `pr-policy` y `ci-ok` en verde, 1 aprobación de otro integrante y conversaciones resueltas.
 - **Método:** **Squash and merge**. El commit en staging queda con el título del PR, que es lo que leen las notas de versión.
@@ -118,7 +119,7 @@ Reglas de la promoción:
 4. Comprueba:
    - Settings → Rules muestra 4 rulesets;
    - Releases muestra `v1.0.0`;
-   - la rama por defecto es `staging`.
+   - la rama por defecto es `main` y existe `staging`.
 
 > En un repo privado del plan Free, los checks informan pero no bloquean y el borrado automático de ramas queda desactivado. El flujo depende entonces de la disciplina del equipo.
 

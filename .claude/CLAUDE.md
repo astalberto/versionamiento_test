@@ -17,7 +17,7 @@ Repo de **prueba** de la plantilla de CI/CD y versionamiento: política de PR, C
 
 ## Flujo de Git (obligatorio)
 
-- **Ramas:** `staging` es desarrollo y rama por defecto; `main` es producción y solo recibe la promoción y los hotfix.
+- **Ramas:** `main` es producción y rama por defecto, y solo recibe la promoción y los hotfix; `staging` es desarrollo: todo el trabajo va ahí (al abrir el PR, cambia la base a `staging`).
 - **Ramas de trabajo:** salen de `origin/staging` como `<tipo>/<descripcion-kebab>` o, si hay issue, `<tipo>/<issue>-<descripcion-kebab>` (p. ej. `feat/saludo-formal`, `feat/1-saludo-formal`). El issue es opcional.
   - Tipos: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`.
   - Urgencias de producción: `hotfix/[<issue>-]<descripcion>` desde `origin/main`.

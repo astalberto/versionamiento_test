@@ -119,7 +119,8 @@ function clasificarPR({ base, head, titulo }) {
     }
     errores.push(
       'A `main` solo llegan la promoción (desde `staging`) y los hotfix ' +
-        '(`hotfix/<descripcion>`). El trabajo normal va contra `staging`.'
+        '(`hotfix/<descripcion>`). El trabajo normal va contra `staging`: ' +
+        'cambia la base del PR con «Edit» junto al título.'
     );
     return { clase: 'invalida', errores, avisos };
   }
