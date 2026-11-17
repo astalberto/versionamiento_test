@@ -60,35 +60,43 @@ test('normalizarPR: issue desde el cuerpo si la rama no lo trae', () => {
   assert.equal(p.issue, 77);
 });
 
-test('renderizarNotas: aporte por integrante, tablas por tipo y dependencias', async () => {
+test('renderizarNotas: listas por sección, una línea por PR y pie con contribuidores', async () => {
   const github = crearGithub(escenario());
   const prs = await recolectarPRs({ github, owner: 'org', repo: 'repo', base: 'v1.0.0', head: 'head' });
   const md = renderizarNotas({ prs, equipo: EQUIPO, titulo: 'v1.1.0', subtitulo: '16/10/2026', compareUrl: 'https://x/compare' });
 
-  assert.match(md, /^## v1\.1\.0$/m);
-  assert.match(md, /_16\/10\/2026 · 3 PRs · 2 integrantes · \[ver diferencias\]\(https:\/\/x\/compare\)_/);
-  // Mapeo de login sin importar mayúsculas y conteos por tipo.
-  assert.match(md, /\| Ana López \(@alopez\) \| FrontEnd \| 1 \| 1 \| 0 \| 0 \| Web \|/);
-  assert.match(md, /\| Luis García \(@lgarcia\) \| BackEnd \| 1 \| 0 \| 1 \| 0 \| API, Docs \|/);
-  assert.match(md, /### ✨ Funcionalidades/);
-  assert.match(md, /\| \[#3\]\(https:\/\/github\.com\/org\/repo\/pull\/3\) \| `web` login con OAuth \| Ana López \| Web \| #42 \| @mperez \|/);
-  // El "|" del título no rompe la tabla.
-  assert.match(md, /timeout \\\| proxy/);
-  assert.match(md, /### 🤖 Dependencias\n\n- \[#5\]/);
-  assert.doesNotMatch(md, /#6|#2\b/);
+  assert.equal(
+    md,
+    [
+      '## v1.1.0',
+      '',
+      '### Agregado o cambiado',
+      '- Login con OAuth ([#3](https://github.com/org/repo/pull/3))',
+      '',
+      '### Corregido',
+      '- Timeout | proxy ([#4](https://github.com/org/repo/pull/4))',
+      '',
+      '### Mantenimiento',
+      '- Bump actions/checkout ([#5](https://github.com/org/repo/pull/5))',
+      '',
+      // Nombres de equipo.json (login sin importar mayúsculas); los bots no cuentan.
+      '<sub>16/10/2026 · Contribuyeron: Ana López (@alopez), Luis García (@lgarcia) · [Ver cambios](https://x/compare)</sub>',
+      '',
+    ].join('\n')
+  );
+  assert.doesNotMatch(md, /#6|#2\b/); // sin sincronizaciones ni PRs fuera del rango
 });
 
-test('renderizarNotas: sin menciones en la vista previa y fallback @login', () => {
-  const prs = [normalizarPR(pr({ numero: 1, titulo: 'feat!: nueva API', autor: 'desconocido', head: 'feat/1-api', sha: 's' }), ['revisor'])];
+test('renderizarNotas: incompatibles, sin menciones en la vista previa y fallback @login', () => {
+  const prs = [normalizarPR(pr({ numero: 1, titulo: 'feat!: nueva API', autor: 'desconocido', head: 'feat/1-api', sha: 's' }))];
   const md = renderizarNotas({ prs, equipo: EQUIPO, menciones: false });
-  assert.match(md, /\| `@desconocido` \| — \| 1 \| 1 \| 0 \| 0 \| General \|/);
-  assert.match(md, /⚠️ \*\*BREAKING\*\* nueva API/);
-  assert.match(md, /`@revisor`/);
-  assert.doesNotMatch(md, /(^|[^`])@revisor/);
+  assert.match(md, /^- \*\*Incompatible:\*\* Nueva API \(\[#1\]/m);
+  assert.match(md, /Contribuyeron: `@desconocido`/);
+  assert.doesNotMatch(md, /(^|[^`])@desconocido/);
 });
 
 test('renderizarNotas: rango vacío', () => {
-  assert.match(renderizarNotas({ prs: [], equipo: EQUIPO }), /Sin cambios en este rango\./);
+  assert.match(renderizarNotas({ prs: [], equipo: EQUIPO }), /^Sin cambios\.$/m);
 });
 
 test('cargarEquipo: sin equipo.json devuelve un equipo vacío', () => {

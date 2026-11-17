@@ -72,7 +72,7 @@ test('hotfix que arrastra commits de staging: falla', async () => {
   const { salida, comentario, github } = await correr(estado, prAbierto({ titulo: 'fix: crash', head: 'hotfix/57-crash', base: 'main' }));
   assert.ok(salida.fallo);
   assert.match(comentario, /trae 1 commit\(s\) de staging/);
-  assert.equal(github.escrituras('pulls.update')[0].body, 'Refs #57\n');
+  assert.equal(github.escrituras('pulls.update')[0].body, 'Closes #57\n');
   assert.deepEqual(github.escrituras('addLabels')[0].labels, ['hotfix']);
 });
 

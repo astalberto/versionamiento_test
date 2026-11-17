@@ -38,9 +38,9 @@ test('promoción fusionada: publica v1.1.0 con las notas', async () => {
   assert.equal(release.target_commitish, 'm1');
   assert.equal(release.make_latest, 'true');
   assert.match(release.body, /Promoción \[#7\]\(.*\) · 16\/10\/2026/);
-  assert.match(release.body, /👥 Aporte por integrante/);
-  assert.match(release.body, /\[#3\]/);
-  assert.doesNotMatch(release.body, /\[#7\]\(https:\/\/github\.com\/org\/repo\/pull\/7\) \|/); // la promoción no es un aporte
+  assert.match(release.body, /### Agregado o cambiado\n- Login \(\[#3\]/);
+  assert.match(release.body, /### Corregido\n- Timeout \(\[#4\]/);
+  assert.doesNotMatch(release.body, /^- .*\[#7\]/m); // la promoción no es un aporte
   assert.deepEqual(salida.outputs, { publicado: 'true', version: '1.1.0', tag: 'v1.1.0' });
   assert.doesNotMatch(salida.summary, /Falta sincronizar/);
 });
@@ -95,6 +95,6 @@ test('staging: resume lo acumulado y la próxima versión sin publicar nada', as
   const estado = { tags: [{ name: 'v1.0.0', sha: 'base' }], compare: { 'v1.0.0...s9': [commit('c1')] }, prs: promocion().prs };
   const { github, salida } = await correr(resumenStaging, estado, contexto('s9', 'refs/heads/staging'));
   assert.deepEqual(github.escrituras('createRelease'), []);
-  assert.match(salida.summary, /Aporte acumulado · próxima v1\.1\.0/);
+  assert.match(salida.summary, /Próxima versión: v1\.1\.0 \(sin publicar\)/);
   assert.match(salida.summary, /16\/10\/2026 · desde v1\.0\.0/);
 });

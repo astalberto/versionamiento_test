@@ -1,23 +1,20 @@
 'use strict';
 
-// Notas de versión: quién hizo qué, de qué área y quién lo aprobó. Las usan
-// release.js (GitHub Release en main y resumen de staging) y pr-policy.js
-// (vista previa en el PR de promoción).
+// Notas de versión en estilo changelog: una lista corta por sección y una
+// línea por PR. Las usan release.js (GitHub Release en main y resumen de
+// staging) y pr-policy.js (vista previa en el PR de promoción).
 
 const fs = require('node:fs');
 const path = require('node:path');
 const { parseRama, parseTitulo, issueEnCuerpo } = require('./rules.js');
 
+// Lo que ve quien usa el proyecto va primero; lo interno (docs, CI, pruebas,
+// dependencias…) se agrupa al final en Mantenimiento.
 const SECCIONES = [
-  { titulo: '✨ Funcionalidades', tipos: ['feat'] },
-  { titulo: '🐛 Correcciones', tipos: ['fix'] },
-  { titulo: '⚡ Rendimiento', tipos: ['perf'] },
-  { titulo: '♻️ Refactorización', tipos: ['refactor'] },
-  { titulo: '📚 Documentación', tipos: ['docs'] },
-  { titulo: '✅ Pruebas', tipos: ['test'] },
-  { titulo: '🏗️ Build y CI', tipos: ['build', 'ci'] },
-  { titulo: '🧹 Mantenimiento', tipos: ['chore', 'style'] },
-  { titulo: '⏪ Reversiones', tipos: ['revert'] },
+  { titulo: 'Agregado o cambiado', tipos: ['feat', 'perf', 'refactor'] },
+  { titulo: 'Corregido', tipos: ['fix'] },
+  { titulo: 'Revertido', tipos: ['revert'] },
+  { titulo: 'Mantenimiento', tipos: null }, // el resto de tipos y los bots
 ];
 // Promociones (head staging) y sincronizaciones (head main) solo mueven
 // trabajo entre ramas: no son aporte nuevo y no van en las notas.
@@ -71,8 +68,8 @@ async function prFusionadoEn({ github, owner, repo, base, sha }) {
 
 // PRs fusionados cuyo commit de merge (squash en staging, merge commit en
 // main) está en base...head. No se usa la API "PRs asociados a un commit":
-// para commits que no están en la rama por defecto (staging) solo devuelve
-// PRs abiertos, y los merges de main no están en staging.
+// para commits que no están en la rama por defecto solo devuelve PRs
+// abiertos, y los squash de staging no están en main hasta la promoción.
 async function recolectarPRs({ github, owner, repo, base, head }) {
   const commits = await commitsEntre({ github, owner, repo, base, head });
   if (commits.length === 0) return [];
@@ -133,94 +130,50 @@ function normalizarPR(pr, aprobadores = []) {
 
 // ─── Render ───────────────────────────────────────────────────────────────
 
-function escapar(texto) {
-  return String(texto).replace(/\|/g, '\\|').replace(/\r?\n/g, ' ');
-}
-
 // En el Release las menciones (@login) enlazan a los contribuidores; en el
 // comentario de vista previa van como código para no notificar en cada push.
 function usuario(login, menciones) {
   return menciones ? `@${login}` : `\`@${login}\``;
 }
 
-function integrante(login, equipo) {
+function contribuidor(login, equipo, menciones) {
   const buscado = login.toLowerCase();
   const m = (equipo.integrantes || []).find((i) => i.github && i.github.toLowerCase() === buscado);
-  return m ? { nombre: m.nombre, rol: m.rol } : { nombre: null, rol: '—' };
+  return m && m.nombre ? `${m.nombre} (${usuario(login, menciones)})` : usuario(login, menciones);
 }
 
-function areasDe(pr, equipo) {
-  if (pr.areas.length === 0) return ['General'];
-  return pr.areas.map((label) => ((equipo.areas || {})[label] ? equipo.areas[label].nombre : label.replace(/^area:/, '')));
+function seccionDe(pr) {
+  if (pr.esBot) return 'Mantenimiento';
+  const s = SECCIONES.find((x) => x.tipos && x.tipos.includes(pr.tipo));
+  return s ? s.titulo : 'Mantenimiento';
 }
 
-function plural(n, palabra) {
-  return `${n} ${palabra}${n === 1 ? '' : 's'}`;
+// "función despedir" → "- Función despedir (#2)", con aviso si rompe compatibilidad.
+function linea(pr) {
+  const texto = String(pr.descripcion).replace(/\r?\n/g, ' ').trim();
+  const frase = texto.charAt(0).toUpperCase() + texto.slice(1);
+  return `- ${pr.breaking ? '**Incompatible:** ' : ''}${frase} ([#${pr.numero}](${pr.url}))`;
 }
 
 function renderizarNotas({ prs, equipo, titulo = null, subtitulo = '', compareUrl = null, menciones = true }) {
-  const humanos = prs.filter((p) => !p.esBot);
-  const bots = prs.filter((p) => p.esBot);
-  const autores = [...new Set(humanos.map((p) => p.autor))];
-
   const lineas = [];
   if (titulo) lineas.push(`## ${titulo}`, '');
-  const meta = [subtitulo, plural(prs.length, 'PR'), plural(autores.length, 'integrante')];
-  if (compareUrl) meta.push(`[ver diferencias](${compareUrl})`);
-  lineas.push(`_${meta.filter(Boolean).join(' · ')}_`, '');
 
   if (prs.length === 0) {
-    lineas.push('Sin cambios en este rango.');
-    return `${lineas.join('\n')}\n`;
-  }
-
-  if (humanos.length > 0) {
-    const filas = autores.map((login) => {
-      const suyos = humanos.filter((p) => p.autor === login);
-      const info = integrante(login, equipo);
-      const feat = suyos.filter((p) => p.tipo === 'feat').length;
-      const fix = suyos.filter((p) => p.tipo === 'fix').length;
-      return {
-        orden: [-suyos.length, info.nombre || login],
-        celdas: [
-          info.nombre ? `${info.nombre} (${usuario(login, menciones)})` : usuario(login, menciones),
-          info.rol,
-          suyos.length,
-          feat,
-          fix,
-          suyos.length - feat - fix,
-          [...new Set(suyos.flatMap((p) => areasDe(p, equipo)))].join(', '),
-        ],
-      };
-    });
-    filas.sort((a, b) => a.orden[0] - b.orden[0] || a.orden[1].localeCompare(b.orden[1], 'es'));
-    lineas.push('### 👥 Aporte por integrante', '');
-    lineas.push('| Integrante | Rol | PRs | ✨ feat | 🐛 fix | Otros | Áreas |', '|---|---|---:|---:|---:|---:|---|');
-    for (const f of filas) lineas.push(`| ${f.celdas.map(escapar).join(' | ')} |`);
-    lineas.push('');
-  }
-
-  const conocidos = new Set(SECCIONES.flatMap((s) => s.tipos));
-  for (const s of [...SECCIONES, { titulo: '📦 Otros', tipos: null }]) {
-    const deTipo = humanos.filter((p) => (s.tipos ? s.tipos.includes(p.tipo) : !conocidos.has(p.tipo)));
-    if (deTipo.length === 0) continue;
-    lineas.push(`### ${s.titulo}`, '');
-    lineas.push('| PR | Cambio | Integrante | Área | Issue | Aprobó |', '|---|---|---|---|---|---|');
-    for (const p of deTipo) {
-      const cambio = `${p.scope ? `\`${p.scope}\` ` : ''}${p.breaking ? '⚠️ **BREAKING** ' : ''}${p.descripcion}`;
-      const autor = integrante(p.autor, equipo).nombre || usuario(p.autor, menciones);
-      const aprobo = p.aprobadores.length ? p.aprobadores.map((a) => usuario(a, menciones)).join(', ') : '—';
-      const celdas = [cambio, autor, areasDe(p, equipo).join(', '), p.issue ? `#${p.issue}` : '—', aprobo].map(escapar);
-      lineas.push(`| [#${p.numero}](${p.url}) | ${celdas.join(' | ')} |`);
+    lineas.push('Sin cambios.', '');
+  } else {
+    for (const { titulo: seccion } of SECCIONES) {
+      const deSeccion = prs.filter((p) => seccionDe(p) === seccion);
+      if (deSeccion.length > 0) lineas.push(`### ${seccion}`, ...deSeccion.map(linea), '');
     }
-    lineas.push('');
   }
 
-  if (bots.length > 0) {
-    lineas.push('### 🤖 Dependencias', '');
-    for (const p of bots) lineas.push(`- [#${p.numero}](${p.url}) ${escapar(p.titulo)}`);
-    lineas.push('');
-  }
+  const autores = [...new Set(prs.filter((p) => !p.esBot).map((p) => p.autor))];
+  const pie = [subtitulo];
+  if (autores.length > 0) pie.push(`Contribuyeron: ${autores.map((a) => contribuidor(a, equipo, menciones)).join(', ')}`);
+  if (compareUrl) pie.push(`[Ver cambios](${compareUrl})`);
+  const meta = pie.filter(Boolean).join(' · ');
+  if (meta) lineas.push(`<sub>${meta}</sub>`);
 
   return `${lineas.join('\n').trimEnd()}\n`;
 }
