@@ -1,12 +1,12 @@
 <!--
 Título del PR = Conventional Commit con el mismo tipo de la rama:
   rama feat/42-login-oauth  →  título "feat(web): login con OAuth"
-El bot valida rama, título e issue, y agrega "Closes #N" si falta.
+El bot valida rama y título; si la rama lleva issue, lo valida y agrega "Closes #N" si falta.
 -->
 
-## Issue
+## Issue (opcional)
 
-<!-- Escribe "Closes #<número>". Si lo olvidas, el bot lo agrega con el número de la rama. -->
+<!-- Si hay issue, "Closes #<número>". Si la rama lleva el número y lo olvidas, el bot lo agrega. -->
 
 ## ¿Qué cambia?
 

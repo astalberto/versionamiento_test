@@ -3,11 +3,11 @@
 // Check requerido `pr-policy` (workflow pr-policy.yml). Valida el PR con las
 // reglas de rules.js, completa solo lo que se puede completar (referencia al
 // issue, título de promoción/sincronización, etiqueta de clase) y deja UN
-// comentario con el resultado. En la promoción semanal muestra la versión y
+// comentario con el resultado. En la promoción muestra la versión y
 // las notas que se publicarán al fusionar.
 
 const { clasificarPR, parseTitulo, issuesEnCuerpo } = require('./rules.js');
-const { ultimaEstable, siguiente, formatear, numeroSemana, rangoSemana, formatoFecha, configSemana } = require('./version.js');
+const { ultimaEstable, siguiente, formatear } = require('./version.js');
 const { cargarEquipo, listarTags, commitsEntre, recolectarPRs, renderizarNotas } = require('./release-notes.js');
 
 const MARCADOR = '<!-- pr-policy -->';
@@ -15,7 +15,7 @@ const DESCRIPCION_CLASE = {
   trabajo: 'aporte a staging',
   dependencias: 'actualización de dependencias',
   sincronizacion: 'sincronización main → staging',
-  promocion: 'promoción semanal staging → main',
+  promocion: 'promoción staging → main',
   hotfix: 'hotfix a main',
   invalida: 'combinación de ramas no permitida',
 };
@@ -61,7 +61,7 @@ async function asegurarReferencia({ github, owner, repo, pr, numero, clase, ok }
 
 async function verificarOrigenHotfix({ github, owner, repo, pr, ok, errores }) {
   // Un hotfix debe salir de main: si arrastra commits de staging aún no
-  // publicados, el "parche" publicaría a medias el trabajo de la semana.
+  // publicados, el "parche" publicaría a medias trabajo aún no promovido.
   const [delHotfix, deStaging] = await Promise.all([
     commitsEntre({ github, owner, repo, base: 'main', head: pr.head.sha }),
     commitsEntre({ github, owner, repo, base: 'main', head: 'staging' }),
@@ -83,7 +83,7 @@ async function fijarTitulo({ github, owner, repo, pr, titulo, ok }) {
   ok.push(`Título del PR: \`${titulo}\`.`);
 }
 
-async function prepararPromocion({ github, owner, repo, pr, ahora, ok, errores, avisos }) {
+async function prepararPromocion({ github, owner, repo, pr, ok, errores }) {
   const tags = await listarTags({ github, owner, repo });
   const ultima = ultimaEstable(tags.map((t) => t.name));
   if (!ultima) {
@@ -92,9 +92,7 @@ async function prepararPromocion({ github, owner, repo, pr, ahora, ok, errores, 
   }
   const mayor = (pr.labels || []).some((l) => l.name === 'version:mayor');
   const version = formatear(siguiente(ultima.version, mayor ? 'major' : 'minor'));
-  const { inicio, tz } = configSemana();
-  const semana = numeroSemana(ahora, inicio, tz);
-  await fijarTitulo({ github, owner, repo, pr, titulo: `chore(release): v${version} · Semana ${semana}`, ok });
+  await fijarTitulo({ github, owner, repo, pr, titulo: `chore(release): v${version}`, ok });
 
   // Commits normales (no merge) en main que staging no tiene = hotfix sin
   // sincronizar. Las promociones anteriores son merge commits y no cuentan.
@@ -104,23 +102,17 @@ async function prepararPromocion({ github, owner, repo, pr, ahora, ok, errores, 
     errores.push(`main tiene ${sinSincronizar} commit(s) de hotfix que staging no tiene. Primero fusiona el PR de sincronización \`main → staging\`.`);
   }
 
-  const { data: releases } = await github.rest.repos.listReleases({ owner, repo, per_page: 20 });
-  const mismaSemana = releases.find((r) => !r.draft && !r.prerelease && (r.name || '').endsWith(`· Semana ${semana}`));
-  if (mismaSemana) avisos.push(`Ya se publicó ${mismaSemana.tag_name} en la Semana ${semana}; la convención es una promoción por semana.`);
-
   const prs = await recolectarPRs({ github, owner, repo, base: ultima.tag, head: pr.head.sha });
   if (prs.length === 0) {
     errores.push(`No hay PRs nuevos en staging desde ${ultima.tag}: no hay nada que promover.`);
     return '';
   }
-  ok.push(`Al fusionar se publica **v${version}** (${mayor ? 'major por la etiqueta `version:mayor`' : 'minor semanal'}) con ${prs.length} PR(s).`);
+  ok.push(`Al fusionar se publica **v${version}** (${mayor ? 'major por la etiqueta `version:mayor`' : 'minor'}) con ${prs.length} PR(s).`);
 
-  const { lunes, domingo } = rangoSemana(semana, inicio);
   const notas = renderizarNotas({
     prs,
     equipo: cargarEquipo(),
-    titulo: `v${version} · Semana ${semana}`,
-    subtitulo: `${formatoFecha(lunes)} – ${formatoFecha(domingo)}`,
+    titulo: `v${version}`,
     compareUrl: `https://github.com/${owner}/${repo}/compare/${ultima.tag}...${pr.head.sha}`,
     menciones: false,
   });
@@ -145,7 +137,7 @@ async function publicarComentario({ github, owner, repo, numero, cuerpo }) {
   else await github.rest.issues.createComment({ owner, repo, issue_number: numero, body: cuerpo });
 }
 
-async function validarPR({ github, context, core, ahora = new Date() }) {
+async function validarPR({ github, context, core }) {
   const { owner, repo } = context.repo;
   const pr = context.payload.pull_request;
   const r = clasificarPR({ base: pr.base.ref, head: pr.head.ref, titulo: pr.title });
@@ -155,11 +147,16 @@ async function validarPR({ github, context, core, ahora = new Date() }) {
 
   if (r.clase === 'trabajo' || r.clase === 'hotfix') {
     if (r.errores.length === 0 && parseTitulo(pr.title)) ok.push(`Título Conventional Commits con el tipo de la rama (\`${r.tipo}\`).`);
-    await verificarIssue({ github, owner, repo, numero: r.issue, ok, errores });
-    await asegurarReferencia({ github, owner, repo, pr, numero: r.issue, clase: r.clase, ok });
+    // El issue es opcional: solo se valida y referencia si la rama lo lleva.
+    if (r.issue) {
+      await verificarIssue({ github, owner, repo, numero: r.issue, ok, errores });
+      await asegurarReferencia({ github, owner, repo, pr, numero: r.issue, clase: r.clase, ok });
+    } else {
+      ok.push('Sin issue enlazado (opcional).');
+    }
     if (r.clase === 'hotfix') await verificarOrigenHotfix({ github, owner, repo, pr, ok, errores });
   } else if (r.clase === 'promocion') {
-    detalle = await prepararPromocion({ github, owner, repo, pr, ahora, ok, errores, avisos });
+    detalle = await prepararPromocion({ github, owner, repo, pr, ok, errores });
   } else if (r.clase === 'sincronizacion') {
     await fijarTitulo({ github, owner, repo, pr, titulo: 'chore(sync): main → staging', ok });
   }

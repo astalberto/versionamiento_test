@@ -63,10 +63,10 @@ test('normalizarPR: issue desde el cuerpo si la rama no lo trae', () => {
 test('renderizarNotas: aporte por integrante, tablas por tipo y dependencias', async () => {
   const github = crearGithub(escenario());
   const prs = await recolectarPRs({ github, owner: 'org', repo: 'repo', base: 'v1.0.0', head: 'head' });
-  const md = renderizarNotas({ prs, equipo: EQUIPO, titulo: 'v1.1.0 · Semana 2', subtitulo: '12/10/2026 – 18/10/2026', compareUrl: 'https://x/compare' });
+  const md = renderizarNotas({ prs, equipo: EQUIPO, titulo: 'v1.1.0', subtitulo: '16/10/2026', compareUrl: 'https://x/compare' });
 
-  assert.match(md, /^## v1\.1\.0 · Semana 2$/m);
-  assert.match(md, /_12\/10\/2026 – 18\/10\/2026 · 3 PRs · 2 integrantes · \[ver diferencias\]\(https:\/\/x\/compare\)_/);
+  assert.match(md, /^## v1\.1\.0$/m);
+  assert.match(md, /_16\/10\/2026 · 3 PRs · 2 integrantes · \[ver diferencias\]\(https:\/\/x\/compare\)_/);
   // Mapeo de login sin importar mayúsculas y conteos por tipo.
   assert.match(md, /\| Ana López \(@alopez\) \| FrontEnd \| 1 \| 1 \| 0 \| 0 \| Web \|/);
   assert.match(md, /\| Luis García \(@lgarcia\) \| BackEnd \| 1 \| 0 \| 1 \| 0 \| API, Docs \|/);
