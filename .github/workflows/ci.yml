@@ -1,0 +1,265 @@
+name: CI
+
+# CI por app: verifica solo los proyectos del monorepo que cambiaron, cada uno
+# con el pipeline de su stack (Flutter, Node o Python). El stack lo detecta
+# .github/scripts/detect-projects.sh por el manifiesto de cada carpeta, así la
+# misma plantilla sirve para repos con stacks distintos.
+#
+# El único check requerido es `ci-ok` (rulesets de staging y main): resume a
+# los demás jobs, así un proyecto sin cambios (job omitido) no bloquea el
+# merge. No renombrar `ci-ok` sin actualizar .github/rulesets/.
+
+on:
+  pull_request:
+    branches: [staging, main]
+  push:
+    branches: [staging, main]
+  workflow_dispatch:
+    inputs:
+      todos:
+        description: "Verificar TODOS los proyectos (ignora el filtro de afectados)"
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.event.pull_request.number || github.ref }}
+  # En un PR, un push nuevo deja obsoleta la corrida anterior: se cancela.
+  # En staging y main se encola, para que cada merge quede verificado.
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  detect:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    outputs:
+      flutter: ${{ steps.detect.outputs.flutter }}
+      node: ${{ steps.detect.outputs.node }}
+      python: ${{ steps.detect.outputs.python }}
+      pipeline: ${{ steps.detect.outputs.pipeline }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Historia completa para el diff contra la base, sin bajar contenidos
+          # de archivos que no se usan (clon blobless).
+          fetch-depth: 0
+          filter: blob:none
+          persist-credentials: false
+
+      # En un PR, github.sha es el merge de prueba con la base: el diff
+      # base.sha..sha es exactamente lo que aporta el PR. En push, before..sha.
+      # Sin base (rama nueva, dispatch) el script verifica todo.
+      - name: Detectar proyectos afectados
+        id: detect
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
+          HEAD_SHA: ${{ github.sha }}
+          TODOS: ${{ inputs.todos || false }}
+        run: bash .github/scripts/detect-projects.sh
+
+  flutter:
+    needs: detect
+    if: needs.detect.outputs.flutter != '[]'
+    name: flutter (${{ matrix.dir }})
+    runs-on: ubuntu-24.04
+    # El build de Android en frío (Gradle + SDK) es lo más lento del CI.
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        dir: ${{ fromJSON(needs.detect.outputs.flutter) }}
+    defaults:
+      run:
+        working-directory: ${{ matrix.dir }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # Gradle de Android requiere Java 17.
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: "17"
+
+      - uses: subosito/flutter-action@1a449444c387b1966244ae4d4f8c696479add0b2 # v2.23.0
+        with:
+          channel: stable
+          # Vacío = último estable. Para builds reproducibles, fijar la
+          # variable del repo FLUTTER_VERSION (p. ej. 3.35.5).
+          flutter-version: ${{ vars.FLUTTER_VERSION }}
+          cache: true
+          pub-cache: true
+
+      - run: flutter pub get
+
+      - name: Formato
+        run: dart format --output=none --set-exit-if-changed .
+
+      - name: Análisis estático
+        run: flutter analyze
+
+      - name: Tests
+        run: |
+          if [ -d test ]; then
+            flutter test
+          else
+            echo "::notice::${{ matrix.dir }} aún no tiene carpeta test/"
+          fi
+
+      # Compila Android en debug: detecta roturas de build sin necesitar las
+      # llaves de firma (esas quedan para el deploy).
+      - name: Build Android (debug)
+        run: flutter build apk --debug
+
+  node:
+    needs: detect
+    if: needs.detect.outputs.node != '[]'
+    name: node (${{ matrix.proyecto.dir }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        proyecto: ${{ fromJSON(needs.detect.outputs.node) }}
+    defaults:
+      run:
+        working-directory: ${{ matrix.proyecto.dir }}
+    env:
+      PM: ${{ matrix.proyecto.pm }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Verificar lockfile
+        if: matrix.proyecto.lock == ''
+        run: |
+          echo "::error file=${{ matrix.proyecto.dir }}/package.json::Falta el lockfile (package-lock.json, pnpm-lock.yaml o yarn.lock). Sin él la instalación no es reproducible: commitéalo."
+          exit 1
+
+      # La versión de pnpm sale de "packageManager" en package.json; si no
+      # está declarada, detect-projects.sh pasa una explícita.
+      - uses: pnpm/action-setup@ea17c68df8912ef543352723c149a84f56e3d413 # v6.1.0
+        if: matrix.proyecto.pm == 'pnpm'
+        with:
+          version: ${{ matrix.proyecto.pnpm_version }}
+          package_json_file: ${{ matrix.proyecto.dir }}/package.json
+
+      - uses: actions/setup-node@v7
+        with:
+          # 22 como la referencia de deploy; fijable con la variable NODE_VERSION.
+          node-version: ${{ vars.NODE_VERSION || '22' }}
+          # Yarn moderno se activa con corepack después de este paso, así que
+          # su caché no se configura aquí.
+          cache: ${{ matrix.proyecto.pm != 'yarn' && matrix.proyecto.pm || '' }}
+          cache-dependency-path: ${{ matrix.proyecto.lock }}
+
+      - name: Instalar dependencias
+        run: |
+          case "$PM" in
+            pnpm) pnpm install --frozen-lockfile ;;
+            yarn) corepack enable && yarn install --immutable ;;
+            *) npm ci ;;
+          esac
+
+      # Cada proyecto define sus scripts (React, Next.js, NestJS, Express…): se
+      # corren los que existan, en este orden.
+      - name: lint, typecheck, test y build
+        run: |
+          for script in lint typecheck test build; do
+            if node -e "process.exit(require('./package.json').scripts?.['$script'] ? 0 : 1)"; then
+              echo "::group::$PM run $script"
+              "$PM" run "$script"
+              echo "::endgroup::"
+            else
+              echo "::notice::${{ matrix.proyecto.dir }}: sin script \"$script\" en package.json (se omite)"
+            fi
+          done
+
+  python:
+    needs: detect
+    if: needs.detect.outputs.python != '[]'
+    name: python (${{ matrix.dir }})
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        dir: ${{ fromJSON(needs.detect.outputs.python) }}
+    defaults:
+      run:
+        working-directory: ${{ matrix.dir }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      # uv instala el Python que pida el proyecto (.python-version o
+      # requires-python) y cachea las dependencias.
+      - uses: astral-sh/setup-uv@1c37ad07a6a961277cf70c0d37d6f313000f5884 # v10.3.0
+        with:
+          working-directory: ${{ matrix.dir }}
+
+      - name: Instalar dependencias
+        run: |
+          if [ -f uv.lock ]; then uv sync --locked; else uv sync; fi
+
+      # --with: usa la versión del proyecto si la declara como dependencia de
+      # desarrollo; si no, una temporal.
+      - name: Lint (ruff)
+        run: uv run --with ruff ruff check .
+
+      - name: Formato (ruff)
+        run: uv run --with ruff ruff format --check .
+
+      - name: Tests (pytest)
+        run: |
+          # Código 5 = no se encontraron tests: todavía no es un error.
+          uv run --with pytest pytest -q || [ $? -eq 5 ]
+
+  pipeline:
+    needs: detect
+    if: needs.detect.outputs.pipeline == 'true'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ vars.NODE_VERSION || '22' }}
+
+      - name: Tests de los scripts del pipeline
+        run: node --test ".github/scripts/**/*.test.js"
+
+      # Imágenes fijadas por versión. actionlint incluye shellcheck para los
+      # bloques run: de los workflows; el segundo paso revisa los .sh sueltos.
+      - name: actionlint
+        run: docker run --rm -v "$PWD:/repo" --workdir /repo rhysd/actionlint:1.7.12 -color
+
+      - name: shellcheck
+        run: docker run --rm -v "$PWD:/mnt" --workdir /mnt koalaman/shellcheck:v0.11.0 .github/scripts/*.sh scripts/*.sh
+
+  # Check requerido: falla si algún job falló o se canceló. Los omitidos
+  # (proyecto sin cambios) cuentan como OK.
+  ci-ok:
+    if: always()
+    needs: [detect, flutter, node, python, pipeline]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - name: Resultado del CI
+        env:
+          RESULTADOS: ${{ toJSON(needs.*.result) }}
+          FALLO: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
+        run: |
+          echo "Resultados: $RESULTADOS"
+          if [ "$FALLO" = "true" ]; then
+            echo "::error::Algún job del CI falló o se canceló."
+            exit 1
+          fi

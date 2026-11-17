@@ -1,0 +1,4 @@
+# Finales de línea normalizados. Los scripts de shell siempre en LF: con CRLF
+# (checkout en Windows) bash falla con "$'\r': command not found".
+* text=auto
+*.sh text eol=lf

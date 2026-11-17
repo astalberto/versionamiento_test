@@ -1,0 +1,20 @@
+# Etiquetas de área según las carpetas que toca el PR (actions/labeler, job
+# `labels` de pr-policy.yml). Las notas de versión agrupan el aporte por estas
+# áreas. scripts/setup-repo.sh crea las etiquetas a partir de este archivo.
+# Ajusta las carpetas a la estructura de cada repo.
+
+"area:apps":
+  - changed-files:
+      - any-glob-to-any-file: "apps/**"
+
+"area:servicios":
+  - changed-files:
+      - any-glob-to-any-file: "services/**"
+
+"area:devsecops":
+  - changed-files:
+      - any-glob-to-any-file: [".github/**", "scripts/**", ".claude/**", ".gitignore", ".gitattributes"]
+
+"area:docs":
+  - changed-files:
+      - any-glob-to-any-file: ["docs/**", "*.md"]

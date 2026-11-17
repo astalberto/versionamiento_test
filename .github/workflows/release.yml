@@ -1,0 +1,93 @@
+name: Release
+
+# Publica la versión cuando se fusiona en main una promoción semanal
+# (staging → main: sube minor) o un hotfix (sube patch): tag vX.Y.Z y GitHub
+# Release con el aporte por integrante y área, que es el material de la
+# defensa semanal. Sin Release PRs ni pasos manuales. En staging no crea
+# tags: solo resume en el job lo acumulado de la semana y la versión que
+# saldría. Lógica en .github/scripts/release.js.
+#
+# Reutilizable (workflow_call), siguiendo el patrón de la referencia de
+# deploy (release → checks → deploy): cuando exista deploy-production.yml,
+# debe llamar a este workflow como PRIMER job con `uses:` y `needs:`, darle
+# contents: write y pull-requests: read, y entonces QUITAR el trigger push de
+# main de aquí para no publicar dos veces. GITHUB_TOKEN no dispara otros
+# workflows, por eso el deploy no puede colgarse del evento `release`.
+
+on:
+  push:
+    branches: [main, staging]
+  # Reintento manual sobre main (idempotente: no duplica una versión ya
+  # publicada en el mismo commit).
+  workflow_dispatch:
+  workflow_call:
+    outputs:
+      publicado:
+        description: "true si este run publicó una versión nueva"
+        value: ${{ jobs.publish.outputs.publicado }}
+      version:
+        description: "Versión publicada (o ya publicada en el commit), sin la v"
+        value: ${{ jobs.publish.outputs.version }}
+      tag:
+        description: "Tag de la versión, p. ej. v1.1.0"
+        value: ${{ jobs.publish.outputs.tag }}
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write # crear el tag y el Release
+      pull-requests: read # PR fusionado, sus etiquetas y aprobaciones
+    concurrency:
+      group: release-main
+      # Encolar, nunca cancelar: cortar un release a la mitad puede dejar un
+      # tag sin Release (mismo criterio que la referencia de deploy).
+      cancel-in-progress: false
+    outputs:
+      publicado: ${{ steps.release.outputs.publicado }}
+      version: ${{ steps.release.outputs.version }}
+      tag: ${{ steps.release.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github
+          persist-credentials: false
+
+      - name: Publicar versión
+        id: release
+        uses: actions/github-script@v9
+        env:
+          PROJECT_START_DATE: ${{ vars.PROJECT_START_DATE || '2026-10-05' }}
+          TZ_EQUIPO: ${{ vars.TZ_EQUIPO || 'America/Guayaquil' }}
+        with:
+          script: |
+            const { publicar } = require('./.github/scripts/release.js');
+            await publicar({ github, context, core });
+
+  staging-summary:
+    if: github.ref == 'refs/heads/staging'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github
+          persist-credentials: false
+
+      - name: Resumir el aporte acumulado
+        uses: actions/github-script@v9
+        env:
+          PROJECT_START_DATE: ${{ vars.PROJECT_START_DATE || '2026-10-05' }}
+          TZ_EQUIPO: ${{ vars.TZ_EQUIPO || 'America/Guayaquil' }}
+        with:
+          script: |
+            const { resumenStaging } = require('./.github/scripts/release.js');
+            await resumenStaging({ github, context, core });

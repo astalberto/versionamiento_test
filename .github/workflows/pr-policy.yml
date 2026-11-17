@@ -1,0 +1,67 @@
+name: PR Policy
+
+# Valida cada PR hacia staging o main: nombre de rama, título Conventional
+# Commits, issue enlazado y, en la promoción semanal, la versión y las notas
+# que se publicarán. Reglas en .github/scripts/rules.js (documentadas en
+# CONTRIBUTING.md).
+#
+# pull_request y NO pull_request_target: desde el 02/11/2026 GitHub bloquea
+# pull_request_target por defecto en repos públicos. Además, un check
+# requerido se satisface con cualquier job del mismo nombre, así que ese
+# trigger no protegía por sí solo. La defensa ante cambios a esta política
+# (que corre con la versión del PR) es la aprobación obligatoria del PR: los
+# cambios en .github/ llevan la etiqueta area:devsecops para revisarlos.
+
+on:
+  pull_request:
+    # labeled/unlabeled: poner o quitar `version:mayor` cambia la versión de
+    # la promoción. Las etiquetas que pone el bot no re-disparan (GITHUB_TOKEN).
+    types: [opened, edited, reopened, synchronize, ready_for_review, labeled, unlabeled]
+    branches: [staging, main]
+
+permissions: {}
+
+concurrency:
+  group: pr-policy-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  # Check requerido por los rulesets de staging y main: no renombrar el job.
+  pr-policy:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read # tags, comparaciones y scripts de la base
+      issues: read # validar el issue de la rama
+      pull-requests: write # comentario, título, cuerpo y etiqueta del PR
+    steps:
+      # Solo hacen falta los scripts de .github/.
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: .github
+          persist-credentials: false
+
+      - name: Validar PR
+        uses: actions/github-script@v9
+        env:
+          PROJECT_START_DATE: ${{ vars.PROJECT_START_DATE || '2026-10-05' }}
+          TZ_EQUIPO: ${{ vars.TZ_EQUIPO || 'America/Guayaquil' }}
+        with:
+          script: |
+            const { validarPR } = require('./.github/scripts/pr-policy.js');
+            await validarPR({ github, context, core });
+
+  # Etiquetas de área según las carpetas que toca el PR (.github/labeler.yml).
+  # Las notas de versión agrupan el aporte de cada integrante con ellas.
+  labels:
+    # Los PRs de Dependabot reciben un token de solo lectura: no se etiquetan.
+    if: github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/labeler@v7
+        with:
+          sync-labels: true
