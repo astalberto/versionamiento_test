@@ -12,7 +12,7 @@ Plantilla reutilizable: nada de aquí depende del stack de las apps.
 
 - **`.github/workflows/pr-policy.yml`:** check requerido `pr-policy`. Valida rama, título e issue, fija el título de la promoción y la sincronización, y pone etiquetas de área.
 - **`.github/workflows/ci.yml`:** CI por app afectada (`.github/scripts/detect-projects.sh`). El check requerido es `ci-ok`.
-- **`.github/workflows/release.yml`:** publica `vX.Y.Z · Semana N` al fusionar en main; en staging solo resume lo acumulado. Es reutilizable con `workflow_call`.
+- **`.github/workflows/release.yml`:** publica `vX.Y.Z` al fusionar en main; en staging solo resume lo acumulado. Es reutilizable con `workflow_call`.
 - **`.github/scripts/*.js`:** la lógica, con pruebas `node --test ".github/scripts/**/*.test.js"`. Las reglas de ramas y títulos viven **solo** en `rules.js`.
 - **`.github/rulesets/*.json` y `scripts/setup-repo.sh`** (en la raíz): protección de ramas y tags, nombres de rama permitidos y ajustes de merge.
 

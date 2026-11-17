@@ -1,8 +1,8 @@
 'use strict';
 
-// Notas de versión: quién hizo qué, de qué área y quién lo aprobó. Son el
-// material de la defensa semanal. Las usan release.js (GitHub Release en main
-// y resumen de staging) y pr-policy.js (vista previa en el PR de promoción).
+// Notas de versión: quién hizo qué, de qué área y quién lo aprobó. Las usan
+// release.js (GitHub Release en main y resumen de staging) y pr-policy.js
+// (vista previa en el PR de promoción).
 
 const fs = require('node:fs');
 const path = require('node:path');

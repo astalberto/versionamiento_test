@@ -2,9 +2,9 @@
 
 // Workflow release.yml. En main publica la versión de la promoción o del
 // hotfix recién fusionado (tag + GitHub Release). En staging no crea nada:
-// solo resume en el job lo acumulado de la semana y la versión que saldría.
+// solo resume en el job lo acumulado desde el último release y la versión que saldría.
 
-const { ultimaEstable, siguiente, formatear, numeroSemana, rangoSemana, formatoFecha, configSemana } = require('./version.js');
+const { ultimaEstable, siguiente, formatear, formatoFecha } = require('./version.js');
 const { cargarEquipo, listarTags, prFusionadoEn, recolectarPRs, renderizarNotas } = require('./release-notes.js');
 
 // Salidas del workflow (workflow_call): un futuro deploy-production.yml las
@@ -13,13 +13,6 @@ function salidas(core, { publicado, version = '', tag = '' }) {
   core.setOutput('publicado', String(publicado));
   core.setOutput('version', version);
   core.setOutput('tag', tag);
-}
-
-function semanaActual(ahora) {
-  const { inicio, tz } = configSemana();
-  const semana = numeroSemana(ahora, inicio, tz);
-  const { lunes, domingo } = rangoSemana(semana, inicio);
-  return { semana, rango: `${formatoFecha(lunes)} – ${formatoFecha(domingo)}` };
 }
 
 async function publicar({ github, context, core, ahora = new Date() }) {
@@ -63,13 +56,12 @@ async function publicar({ github, context, core, ahora = new Date() }) {
   const tag = `v${version}`;
   if (tags.some((t) => t.name === tag)) throw new Error(`El tag ${tag} ya existe en otro commit; revisa los tags antes de reintentar.`);
 
-  const { semana, rango } = semanaActual(ahora);
   const origen = incremento === 'patch' ? `Hotfix [#${pr.number}](${pr.html_url})` : `Promoción [#${pr.number}](${pr.html_url})`;
   const prs = await recolectarPRs({ github, owner, repo, base: ultima.tag, head: sha });
   const notas = renderizarNotas({
     prs,
     equipo: cargarEquipo(),
-    subtitulo: `${origen} · ${rango}`,
+    subtitulo: `${origen} · ${formatoFecha(ahora)}`,
     compareUrl: `${repoUrl}/compare/${ultima.tag}...${tag}`,
     menciones: true,
   });
@@ -79,14 +71,14 @@ async function publicar({ github, context, core, ahora = new Date() }) {
     repo,
     tag_name: tag,
     target_commitish: sha,
-    name: `${tag} · Semana ${semana}`,
+    name: tag,
     body: notas,
     make_latest: 'true',
   });
   salidas(core, { publicado: true, version, tag });
-  core.notice(`Publicada ${tag} · Semana ${semana}.`);
+  core.notice(`Publicada ${tag}.`);
 
-  const resumen = core.summary.addHeading(`🚀 ${tag} · Semana ${semana}`, 2).addLink('Ver el release', `${repoUrl}/releases/tag/${tag}`).addRaw(`\n\n${notas}`);
+  const resumen = core.summary.addHeading(`🚀 ${tag}`, 2).addLink('Ver el release', `${repoUrl}/releases/tag/${tag}`).addRaw(`\n\n${notas}`);
   if (incremento === 'patch') {
     const titulo = encodeURIComponent(`chore(sync): main → staging (${tag})`);
     resumen.addRaw(
@@ -107,13 +99,12 @@ async function resumenStaging({ github, context, core, ahora = new Date() }) {
     return;
   }
   const proxima = formatear(siguiente(ultima.version, 'minor'));
-  const { semana, rango } = semanaActual(ahora);
   const prs = await recolectarPRs({ github, owner, repo, base: ultima.tag, head: context.sha });
   const notas = renderizarNotas({
     prs,
     equipo: cargarEquipo(),
-    titulo: `Aporte acumulado · Semana ${semana} · próxima v${proxima}`,
-    subtitulo: `${rango} · desde ${ultima.tag}`,
+    titulo: `Aporte acumulado · próxima v${proxima}`,
+    subtitulo: `${formatoFecha(ahora)} · desde ${ultima.tag}`,
     compareUrl: `${repoUrl}/compare/${ultima.tag}...${context.sha}`,
     menciones: false,
   });

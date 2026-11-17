@@ -18,10 +18,10 @@ Repo de **prueba** de la plantilla de CI/CD y versionamiento: política de PR, C
 ## Flujo de Git (obligatorio)
 
 - **Ramas:** `staging` es desarrollo y rama por defecto; `main` es producción y solo recibe la promoción y los hotfix.
-- **Toda tarea parte de un issue.** La rama sale de `origin/staging` como `<tipo>/<issue>-<descripcion-kebab>`, por ejemplo `feat/1-saludo-formal`.
+- **Ramas de trabajo:** salen de `origin/staging` como `<tipo>/<descripcion-kebab>` o, si hay issue, `<tipo>/<issue>-<descripcion-kebab>` (p. ej. `feat/saludo-formal`, `feat/1-saludo-formal`). El issue es opcional.
   - Tipos: `feat`, `fix`, `docs`, `style`, `refactor`, `perf`, `test`, `build`, `ci`, `chore`, `revert`.
-  - Urgencias de producción: `hotfix/<issue>-<descripcion>` desde `origin/main`.
-- **Título del PR:** Conventional Commit con el mismo tipo de la rama, por ejemplo `feat(web): saludo formal`. El cuerpo lleva `Closes #<issue>`.
+  - Urgencias de producción: `hotfix/[<issue>-]<descripcion>` desde `origin/main`.
+- **Título del PR:** Conventional Commit con el mismo tipo de la rama, por ejemplo `feat(web): saludo formal`. Si hay issue, el cuerpo lleva `Closes #<issue>`.
 - **Merge:** **squash** hacia staging; **merge commit** en la promoción (`staging → main`) y en la sincronización (`main → staging`).
 - **Checks requeridos:** `pr-policy` y `ci-ok`, más 1 aprobación.
 - **Nunca:** push directo a `main` o `staging`, `git push --force` a ramas compartidas, ni crear o mover tags `v*` a mano.
@@ -29,7 +29,7 @@ Repo de **prueba** de la plantilla de CI/CD y versionamiento: política de PR, C
 ## Versionado
 
 - Promoción: sube **minor**. Hotfix: sube **patch**. **Major** solo con la etiqueta `version:mayor` en el PR de promoción.
-- Los releases se titulan `vX.Y.Z · Semana N`, contando desde `PROJECT_START_DATE` (por defecto 2026-10-05).
+- Los releases se titulan `vX.Y.Z`. La promoción se hace cuando lo acumulado en staging está listo, sin calendario fijo.
 - La versión oficial es el tag que crea `release.yml`: no subas versiones a mano en `package.json`.
 
 ## Verificación antes de abrir un PR (igual que el CI)

@@ -8,11 +8,15 @@
 // Tipos de Conventional Commits que acepta el equipo.
 const TIPOS = ['feat', 'fix', 'docs', 'style', 'refactor', 'perf', 'test', 'build', 'ci', 'chore', 'revert'];
 
-// <tipo>/<issue>-<descripcion-en-kebab>, p. ej. feat/42-login-oauth.
-// El número de issue es obligatorio: enlaza rama → issue → PR → release.
-const RAMA_TRABAJO = new RegExp(`^(${TIPOS.join('|')})/([1-9][0-9]*)-([a-z0-9]+(?:-[a-z0-9]+)*)$`);
-// hotfix/<issue>-<descripcion>: sale de main y vuelve a main (sube patch).
-const RAMA_HOTFIX = /^hotfix\/([1-9][0-9]*)-([a-z0-9]+(?:-[a-z0-9]+)*)$/;
+// <tipo>/<descripcion-en-kebab> o <tipo>/<issue>-<descripcion-en-kebab>,
+// p. ej. feat/login-oauth o feat/42-login-oauth. El issue es opcional; si va,
+// se valida y enlaza rama → issue → PR → release. Sin issue, la descripción
+// empieza por letra para que `feat/0-x` o `feat/042-x` no pasen por válidas.
+const SLUG_CON_ISSUE = '([1-9][0-9]*)-([a-z0-9]+(?:-[a-z0-9]+)*)';
+const SLUG_SIN_ISSUE = '([a-z][a-z0-9]*(?:-[a-z0-9]+)*)';
+const RAMA_TRABAJO = new RegExp(`^(${TIPOS.join('|')})/(?:${SLUG_CON_ISSUE}|${SLUG_SIN_ISSUE})$`);
+// hotfix/[<issue>-]<descripcion>: sale de main y vuelve a main (sube patch).
+const RAMA_HOTFIX = new RegExp(`^hotfix/(?:${SLUG_CON_ISSUE}|${SLUG_SIN_ISSUE})$`);
 const RAMA_DEPENDABOT = /^dependabot\//;
 
 // tipo(scope opcional)!: descripción — el título del PR es el mensaje del
@@ -23,7 +27,7 @@ const LARGO_MAX_TITULO = 100;
 // "Closes #42", "fixes #42", "refs #42"…: referencia al issue en el cuerpo.
 const REFERENCIA_ISSUE = /\b(?:close[sd]?|fix(?:e[sd])?|resolve[sd]?|refs?)\s+#([1-9][0-9]*)\b/gi;
 
-const EJEMPLO_RAMA = '`feat/42-login-oauth`';
+const EJEMPLO_RAMA = '`feat/login-oauth` o `feat/42-login-oauth`';
 const EJEMPLO_TITULO = '`feat(web): login con OAuth`';
 
 function parseRama(nombre) {
@@ -31,9 +35,9 @@ function parseRama(nombre) {
   if (rama === 'main' || rama === 'staging') return { clase: rama };
   if (RAMA_DEPENDABOT.test(rama)) return { clase: 'dependabot' };
   let m = RAMA_TRABAJO.exec(rama);
-  if (m) return { clase: 'trabajo', tipo: m[1], issue: Number(m[2]), descripcion: m[3] };
+  if (m) return { clase: 'trabajo', tipo: m[1], issue: m[2] ? Number(m[2]) : null, descripcion: m[3] || m[4] };
   m = RAMA_HOTFIX.exec(rama);
-  if (m) return { clase: 'hotfix', tipo: 'fix', issue: Number(m[1]), descripcion: m[2] };
+  if (m) return { clase: 'hotfix', tipo: 'fix', issue: m[1] ? Number(m[1]) : null, descripcion: m[2] || m[3] };
   return { clase: null };
 }
 
@@ -53,7 +57,7 @@ function issueEnCuerpo(cuerpo) {
 
 function errorNombreRama(head) {
   return (
-    `La rama \`${head}\` no cumple la convención. Usa \`<tipo>/<issue>-<descripcion>\` ` +
+    `La rama \`${head}\` no cumple la convención. Usa \`<tipo>/<descripcion>\` o \`<tipo>/<issue>-<descripcion>\` ` +
     `(p. ej. ${EJEMPLO_RAMA}) con tipo en: ${TIPOS.join(', ')}. ` +
     'Para renombrarla sin perder el PR: GitHub → Branches → ✏️ Rename.'
   );
@@ -78,11 +82,11 @@ function validarTitulo(titulo, tipoEsperado, errores, avisos) {
 }
 
 // Clasifica un PR según su origen y destino. Las clases son:
-//   trabajo        <tipo>/<issue>-… → staging (squash)
+//   trabajo        <tipo>/[<issue>-]… → staging (squash)
 //   dependencias   dependabot/…     → staging
 //   sincronizacion main             → staging (merge commit, tras un hotfix)
 //   promocion      staging          → main    (merge commit, sube minor)
-//   hotfix         hotfix/<issue>-… → main    (merge commit, sube patch)
+//   hotfix         hotfix/[<issue>-]… → main  (merge commit, sube patch)
 //   invalida       cualquier otra combinación
 function clasificarPR({ base, head, titulo }) {
   const errores = [];
@@ -114,8 +118,8 @@ function clasificarPR({ base, head, titulo }) {
       return { clase: 'hotfix', tipo: 'fix', issue: rama.issue, errores, avisos };
     }
     errores.push(
-      'A `main` solo llegan la promoción semanal (desde `staging`) y los hotfix ' +
-        '(`hotfix/<issue>-<descripcion>`). El trabajo normal va contra `staging`.'
+      'A `main` solo llegan la promoción (desde `staging`) y los hotfix ' +
+        '(`hotfix/<descripcion>`). El trabajo normal va contra `staging`.'
     );
     return { clase: 'invalida', errores, avisos };
   }

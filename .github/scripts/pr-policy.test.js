@@ -5,8 +5,6 @@ const assert = require('node:assert/strict');
 const { validarPR, MARCADOR } = require('./pr-policy.js');
 const { crearGithub, crearCore, pr, commit } = require('./fakes.js');
 
-const AHORA = new Date('2026-10-16T12:00:00-05:00'); // viernes de la Semana 2
-
 function contexto(pullRequest) {
   return { repo: { owner: 'org', repo: 'repo' }, payload: { pull_request: pullRequest } };
 }
@@ -18,7 +16,7 @@ function prAbierto({ numero = 10, titulo, head, base = 'staging', body = '', lab
 async function correr(estado, pullRequest) {
   const github = crearGithub(estado);
   const { core, estado: salida } = crearCore();
-  await validarPR({ github, context: contexto(pullRequest), core, ahora: AHORA });
+  await validarPR({ github, context: contexto(pullRequest), core });
   const comentarios = github.escrituras('createComment').concat(github.escrituras('updateComment'));
   return { github, salida, comentario: comentarios.length ? comentarios[0].body : '' };
 }
@@ -38,6 +36,13 @@ test('trabajo: no duplica la referencia si el cuerpo ya la tiene', async () => {
   const estado = { issues: { 42: { title: 'x', state: 'open' } } };
   const { github } = await correr(estado, prAbierto({ titulo: 'feat: x', head: 'feat/42-x', body: 'Refs #10\nCloses #42' }));
   assert.deepEqual(github.escrituras('pulls.update'), []);
+});
+
+test('trabajo sin issue: pasa sin consultar issues ni tocar el cuerpo', async () => {
+  const { github, salida, comentario } = await correr({}, prAbierto({ titulo: 'ci: quitar semanas', head: 'ci/quitar-semanas' }));
+  assert.equal(salida.fallo, null);
+  assert.deepEqual(github.escrituras('pulls.update'), []);
+  assert.match(comentario, /Sin issue enlazado \(opcional\)/);
 });
 
 test('rama inválida: falla y explica cómo corregir', async () => {
@@ -71,7 +76,7 @@ test('hotfix que arrastra commits de staging: falla', async () => {
   assert.deepEqual(github.escrituras('addLabels')[0].labels, ['hotfix']);
 });
 
-test('promoción: fija título con versión y semana, y comenta la vista previa', async () => {
+test('promoción: fija título con la versión y comenta la vista previa', async () => {
   const estado = {
     tags: [{ name: 'v1.0.0', sha: 'base' }],
     compare: { 'staging...main': [], 'v1.0.0...head-10': [commit('c1')] },
@@ -79,9 +84,9 @@ test('promoción: fija título con versión y semana, y comenta la vista previa'
   };
   const { github, salida, comentario } = await correr(estado, prAbierto({ titulo: 'Promoción', head: 'staging', base: 'main' }));
   assert.equal(salida.fallo, null);
-  assert.equal(github.escrituras('pulls.update')[0].title, 'chore(release): v1.1.0 · Semana 2');
+  assert.equal(github.escrituras('pulls.update')[0].title, 'chore(release): v1.1.0');
   assert.deepEqual(github.escrituras('addLabels')[0].labels, ['promocion']);
-  assert.match(comentario, /Al fusionar se publica \*\*v1\.1\.0\*\* \(minor semanal\) con 1 PR\(s\)/);
+  assert.match(comentario, /Al fusionar se publica \*\*v1\.1\.0\*\* \(minor\) con 1 PR\(s\)/);
   assert.match(comentario, /<details><summary>📋 Vista previa de las notas de v1\.1\.0<\/summary>/);
   assert.match(comentario, /`@alopez`/); // sin notificar en la vista previa
 });
@@ -90,15 +95,13 @@ test('promoción con version:mayor, hotfix sin sincronizar y sin cambios', async
   const estado = {
     tags: [{ name: 'v1.4.0', sha: 'm4' }],
     compare: { 'staging...main': [commit('m4', { padres: 2 }), commit('h1')], 'v1.4.0...head-10': [] },
-    releases: [{ name: 'v1.4.0 · Semana 2', tag_name: 'v1.4.0', draft: false, prerelease: false }],
   };
   const { github, salida, comentario } = await correr(
     estado,
     prAbierto({ titulo: 'x', head: 'staging', base: 'main', labels: ['version:mayor', 'promocion'] })
   );
-  assert.equal(github.escrituras('pulls.update')[0].title, 'chore(release): v2.0.0 · Semana 2');
+  assert.equal(github.escrituras('pulls.update')[0].title, 'chore(release): v2.0.0');
   assert.match(comentario, /main tiene 1 commit\(s\) de hotfix/);
-  assert.match(comentario, /⚠️ Ya se publicó v1\.4\.0 en la Semana 2/);
   assert.match(comentario, /no hay nada que promover/);
   assert.match(salida.fallo, /2 problemas/);
   assert.deepEqual(github.escrituras('addLabels'), []); // ya tenía la etiqueta
@@ -113,7 +116,7 @@ test('dependabot con token de solo lectura: valida igual y solo avisa', async ()
   github.rest.issues.createComment = sinPermiso;
   const { core, estado } = crearCore();
   const pull = prAbierto({ titulo: 'ci(deps): bump the acciones group', head: 'dependabot/github_actions/acciones-1a2b' });
-  await validarPR({ github, context: contexto(pull), core, ahora: AHORA });
+  await validarPR({ github, context: contexto(pull), core });
   assert.equal(estado.fallo, null);
   assert.equal(estado.advertencias.length, 2);
   assert.match(estado.summary, /actualización de dependencias/);
